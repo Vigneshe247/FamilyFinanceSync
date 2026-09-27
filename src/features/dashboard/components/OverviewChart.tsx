@@ -170,44 +170,24 @@ export const OverviewChart: React.FC<OverviewChartProps> = ({
           if (t.type === 'income') inc += t.amount;
           else if (t.type === 'expense') exp += t.amount;
         });
-
-        // If All Family is selected and no transactions exist on this date, provide soft realistic baseline curves
-        if (matched.length === 0 && selectedMemberId === 'all') {
-          if (day === 1) inc += 4000000;
-          if (day === 3) inc += 2500000;
-          if (day === 15) inc += 4000000;
-
-          if (day % 3 === 0) exp += 220000 + (day * 35000);
-          if (day % 7 === 0) exp += 480000;
-          if (day === 2) exp += 2000000;
-          if (day === 5) exp += 1250000;
-        }
       } else if (timeframe === 'last_month') {
         const day = i + 1;
+        const dStr = `2026-08-${String(day).padStart(2, '0')}`;
         label = `${day} Aug`;
         fullDateStr = `${day} August 2026`;
 
-        const matched = activeTransactions.filter(t => t.transaction_date && t.transaction_date.slice(0, 7) === '2026-08');
+        const matched = activeTransactions.filter(t => t.transaction_date && t.transaction_date.slice(0, 10) === dStr);
         matched.forEach(t => {
           dayTx.push(t);
-          if (t.type === 'income') inc += Math.round(t.amount / 30);
-          else if (t.type === 'expense') exp += Math.round(t.amount / 30);
+          if (t.type === 'income') inc += t.amount;
+          else if (t.type === 'expense') exp += t.amount;
         });
-
-        if (selectedMemberId === 'all') {
-          if (day === 1) inc += 3800000;
-          if (day === 14) inc += 3800000;
-          exp += (day % 4 === 0 ? 550000 : 180000) + (day * 20000);
-        }
       } else if (timeframe === 'q3') {
         const intervalLabels = ['Jul 1', 'Jul 15', 'Aug 1', 'Aug 15', 'Sep 1', 'Sep 7', 'Sep 14', 'Sep 21', 'Sep 30'];
         label = intervalLabels[Math.min(i, intervalLabels.length - 1)] || `W${i + 1}`;
         fullDateStr = `Q3 Interval ${i + 1}`;
 
-        if (selectedMemberId === 'all') {
-          inc = 8000000 + (i % 3 === 0 ? 3000000 : 0);
-          exp = 4200000 + (i * 280000);
-        } else {
+        if (activeTransactions.length > 0) {
           const totalMemberInc = activeTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
           const totalMemberExp = activeTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
           inc = Math.round(totalMemberInc / 15);
@@ -219,15 +199,13 @@ export const OverviewChart: React.FC<OverviewChartProps> = ({
         label = months[i];
         fullDateStr = `${months[i]} 2026`;
 
-        if (selectedMemberId === 'all') {
-          inc = 9500000 + (i === 8 ? 1000000 : 0);
-          exp = 5200000 + (i * 150000);
-        } else {
-          const totalMemberInc = activeTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-          const totalMemberExp = activeTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-          inc = Math.round(totalMemberInc / 12);
-          exp = Math.round(totalMemberExp / 12);
-        }
+        const monthStr = `2026-${String(i + 1).padStart(2, '0')}`;
+        const matched = activeTransactions.filter(t => t.transaction_date && t.transaction_date.slice(0, 7) === monthStr);
+        matched.forEach(t => {
+          dayTx.push(t);
+          if (t.type === 'income') inc += t.amount;
+          else if (t.type === 'expense') exp += t.amount;
+        });
       }
 
       const net = inc - exp;

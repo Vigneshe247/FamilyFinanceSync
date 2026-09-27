@@ -157,15 +157,6 @@ export const LoansPage: React.FC = () => {
               <Plus size={15} /> Add Loan / Debt
             </button>
           )}
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('loans')}
-            title="Loans & Debt Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

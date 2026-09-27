@@ -105,16 +105,6 @@ export const BudgetsPage: React.FC = () => {
             <Calendar size={14} />
             <span>Active Cycle: 01 Sep — 30 Sep 2026</span>
           </div>
-
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('budgets')}
-            title="Budgets View Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

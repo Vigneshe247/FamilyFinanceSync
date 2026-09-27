@@ -473,7 +473,7 @@ export const FamilyMembersDropdown: React.FC<FamilyMembersDropdownProps> = ({
               type="button"
               onClick={() => {
                 setIsOpen(false);
-                onNavigateToMembers();
+                onNavigateToMembers?.();
               }}
               style={{
                 background: 'none',

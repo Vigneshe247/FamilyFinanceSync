@@ -84,19 +84,7 @@ export const SpendingBreakdownCard: React.FC<SpendingBreakdownCardProps> = ({
       map.set(key, existing);
     });
 
-    const list = Array.from(map.values()).sort((a, b) => b.amount - a.amount);
-
-    if (list.length === 0) {
-      return [
-        { categoryId: 'cat-general', name: 'General', color: '#22A05B', amount: 1980000 },
-        { categoryId: 'cat-food', name: 'Food & Dining', color: '#E5A11E', amount: 1520000 },
-        { categoryId: 'cat-transport', name: 'Transportation', color: '#3E8BF5', amount: 850000 },
-        { categoryId: 'cat-education', name: 'Education', color: '#9B51E0', amount: 700000 },
-        { categoryId: 'cat-bills', name: 'Utilities & Bills', color: '#00B4B6', amount: 320000 },
-      ];
-    }
-
-    return list;
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
   }, [filteredExpenses, categories]);
 
   // Aggregate category income (Income Inflows)
@@ -115,28 +103,18 @@ export const SpendingBreakdownCard: React.FC<SpendingBreakdownCardProps> = ({
       map.set(key, existing);
     });
 
-    const list = Array.from(map.values()).sort((a, b) => b.amount - a.amount);
-
-    if (list.length === 0) {
-      return [
-        { categoryId: 'cat-salary', name: 'Primary Salary', color: '#22A05B', amount: 8500000 },
-        { categoryId: 'cat-freelance', name: 'Consulting & Freelance', color: '#3E8BF5', amount: 1500000 },
-        { categoryId: 'cat-investment-inc', name: 'Dividends & Interest', color: '#E5A11E', amount: 500000 },
-      ];
-    }
-
-    return list;
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
   }, [filteredIncomes, categories]);
 
   // Total amounts
   const calculatedTotalExpense = useMemo(() => {
     const sum = filteredExpenses.reduce((s, t) => s + t.amount, 0);
-    return sum > 0 ? sum : (propTotalSpending > 0 ? propTotalSpending : 5370000);
+    return sum > 0 ? sum : (propTotalSpending > 0 ? propTotalSpending : 0);
   }, [filteredExpenses, propTotalSpending]);
 
   const calculatedTotalIncome = useMemo(() => {
     const sum = filteredIncomes.reduce((s, t) => s + t.amount, 0);
-    return sum > 0 ? sum : (propTotalIncome > 0 ? propTotalIncome : 10500000);
+    return sum > 0 ? sum : (propTotalIncome > 0 ? propTotalIncome : 0);
   }, [filteredIncomes, propTotalIncome]);
 
   // Combined Inflow vs Outflow (Both Mode)

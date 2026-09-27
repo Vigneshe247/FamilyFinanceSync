@@ -318,20 +318,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, set
                   </div>
                 </div>
 
-                {/* Reset button */}
-                <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--line)' }}>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => {
-                      if (confirm('Reset all demo data back to default?')) {
-                        resetToDemoDefaults();
-                      }
-                    }}
-                  >
-                    <RotateCcw size={14} /> Reset Demo Workspace
-                  </button>
-                </div>
+
               </div>
             </div>
           </div>

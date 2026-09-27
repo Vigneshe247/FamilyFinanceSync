@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useFamilyFinance } from '../../context/FamilyFinanceContext';
-import { X, Key, CheckCircle2, AlertCircle } from 'lucide-react';
+import { requestToJoinFamily } from '../../services/familyService';
+import { X, Key, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 interface JoinFamilyModalProps {
   isOpen: boolean;
@@ -8,30 +9,46 @@ interface JoinFamilyModalProps {
 }
 
 export const JoinFamilyModal: React.FC<JoinFamilyModalProps> = ({ isOpen, onClose }) => {
-  const { joinFamily } = useFamilyFinance();
+  const { joinFamily: joinLocalFamily } = useFamilyFinance();
 
   const [inviteCode, setInviteCode] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
+    setIsSubmitting(true);
 
-    const res = joinFamily(inviteCode);
-    if (!res.success) {
-      setErrorMsg(res.message);
-      return;
+    try {
+      const res = await requestToJoinFamily(inviteCode);
+      if (!res.success) {
+        setErrorMsg(res.error || 'Failed to submit join request.');
+        return;
+      }
+
+      joinLocalFamily(inviteCode);
+
+      if (res.status === 'pending') {
+        setSuccessMsg(`Request sent! Waiting for Family Head approval.`);
+      } else {
+        setSuccessMsg('Successfully joined family workspace!');
+      }
+
+      setTimeout(() => {
+        setSuccessMsg('');
+        setInviteCode('');
+        onClose();
+      }, 1600);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'An unexpected error occurred.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setSuccessMsg(res.message);
-    setTimeout(() => {
-      setSuccessMsg('');
-      setInviteCode('');
-      onClose();
-    }, 1200);
   };
 
   return (

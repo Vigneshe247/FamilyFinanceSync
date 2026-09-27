@@ -146,15 +146,6 @@ export const SharedExpensesPage: React.FC = () => {
               <Plus size={15} /> Split New Family Bill
             </button>
           )}
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('split_expenses')}
-            title="Split Bills Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

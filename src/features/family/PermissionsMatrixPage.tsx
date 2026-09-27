@@ -164,16 +164,6 @@ export const PermissionsMatrixPage: React.FC = () => {
             </p>
           </div>
         </div>
-
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={() => openViewSettingsModal('permissions')}
-          title="Permissions Matrix Settings"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-        >
-          <Settings size={14} />
-          <span>Matrix Settings</span>
-        </button>
       </div>
 
       {/* Notice Banner */}

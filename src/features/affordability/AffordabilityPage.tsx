@@ -92,16 +92,6 @@ export const AffordabilityPage: React.FC<AffordabilityPageProps> = ({ onOpenNewR
             Objective mathematical simulation of purchasing power against family commitments and savings goals
           </p>
         </div>
-
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={() => openViewSettingsModal('requests')}
-          title="Decision Tool & Request Settings"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-        >
-          <Settings size={14} />
-          <span>Settings</span>
-        </button>
       </div>
 
       <div className="grid-2col">

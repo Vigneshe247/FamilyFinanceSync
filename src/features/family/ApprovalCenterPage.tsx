@@ -4,9 +4,15 @@
    and allowance disbursements.
    ========================================================= */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFamilyFinance } from '../../context/FamilyFinanceContext';
 import { formatPaise } from '../../utils/currency';
+import {
+  getPendingFamilyJoinRequests,
+  approveFamilyJoinRequest,
+  rejectFamilyJoinRequest,
+  FamilyJoinRequestRecord,
+} from '../../services/familyService';
 import {
   CheckCircle2,
   XCircle,
@@ -17,6 +23,7 @@ import {
   Coins,
   MessageSquare,
   UserCheck,
+  UserPlus,
   Filter,
   Check,
   X,
@@ -25,6 +32,7 @@ import {
 
 export const ApprovalCenterPage: React.FC = () => {
   const {
+    family,
     requests,
     approveRequest,
     rejectRequest,
@@ -34,9 +42,39 @@ export const ApprovalCenterPage: React.FC = () => {
     categories,
   } = useFamilyFinance();
 
-  const [activeTab, setActiveTab] = useState<'requests' | 'pending_tx' | 'history'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'join_requests' | 'pending_tx' | 'history'>('join_requests');
   const [reviewComment, setReviewComment] = useState<Record<string, string>>({});
   const [questionModalItem, setQuestionModalItem] = useState<string | null>(null);
+
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<FamilyJoinRequestRecord[]>([]);
+  const [actionFeedback, setActionFeedback] = useState('');
+
+  const loadJoinRequests = async () => {
+    const list = await getPendingFamilyJoinRequests(family?.id);
+    setPendingJoinRequests(list);
+  };
+
+  useEffect(() => {
+    loadJoinRequests();
+  }, [family?.id]);
+
+  const handleApproveMember = async (requestId: string) => {
+    const res = await approveFamilyJoinRequest(requestId);
+    if (res.success) {
+      setActionFeedback('Member join request approved!');
+      await loadJoinRequests();
+      setTimeout(() => setActionFeedback(''), 3000);
+    }
+  };
+
+  const handleRejectMember = async (requestId: string) => {
+    const res = await rejectFamilyJoinRequest(requestId);
+    if (res.success) {
+      setActionFeedback('Member join request rejected.');
+      await loadJoinRequests();
+      setTimeout(() => setActionFeedback(''), 3000);
+    }
+  };
 
   const pendingRequests = requests.filter(r => r.status === 'pending');
   const resolvedRequests = requests.filter(r => r.status !== 'pending');
@@ -125,8 +163,36 @@ export const ApprovalCenterPage: React.FC = () => {
         </div>
       </div>
 
+      {actionFeedback && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'rgba(34, 197, 94, 0.12)',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
+            borderRadius: '12px',
+            color: '#15803D',
+            fontSize: '0.88rem',
+            fontWeight: 700,
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <CheckCircle2 size={18} /> {actionFeedback}
+        </div>
+      )}
+
       {/* Segmented Filter Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          className={`btn btn-sm ${activeTab === 'join_requests' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('join_requests')}
+        >
+          <UserPlus size={15} />
+          <span>Member Join Requests ({pendingJoinRequests.length})</span>
+        </button>
+
         <button
           className={`btn btn-sm ${activeTab === 'requests' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('requests')}
@@ -151,6 +217,81 @@ export const ApprovalCenterPage: React.FC = () => {
           <span>Approval History ({resolvedRequests.length})</span>
         </button>
       </div>
+
+      {/* Tab 0: Pending Member Join Requests */}
+      {activeTab === 'join_requests' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {pendingJoinRequests.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+              <CheckCircle2 size={42} color="var(--mint-primary)" style={{ margin: '0 auto 0.75rem' }} />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 0.35rem' }}>No Pending Join Requests</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                All family code join requests have been processed!
+              </p>
+            </div>
+          ) : (
+            pendingJoinRequests.map(req => (
+              <div
+                key={req.id}
+                className="card"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '1.15rem 1.35rem',
+                  borderLeft: '4px solid #2563EB',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      background: 'rgba(37, 99, 235, 0.12)',
+                      color: '#2563EB',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '1.1rem',
+                    }}
+                  >
+                    {req.applicant_name?.charAt(0) || 'U'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      {req.applicant_name}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {req.applicant_email} • Requested: {new Date(req.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleRejectMember(req.id)}
+                    style={{ color: '#EF4444', borderColor: '#EF4444', gap: '0.35rem' }}
+                  >
+                    <X size={15} /> Reject Request
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => handleApproveMember(req.id)}
+                    style={{ background: '#059669', borderColor: '#059669', gap: '0.35rem' }}
+                  >
+                    <Check size={15} /> Approve Member
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Tab 1: Pending Money Requests */}
       {activeTab === 'requests' && (

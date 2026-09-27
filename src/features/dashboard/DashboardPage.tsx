@@ -92,13 +92,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const [balanceVisible, setBalanceVisible] = useState(!settings.dashboard.maskBalancesDefault);
 
   // Financial Plan To-Do Tasks State
-  const [planTasks, setPlanTasks] = useState<Array<{ id: string; title: string; completed: boolean; tag: string }>>([
-    { id: '1', title: 'Rebalance Emergency Vault (₹2.5L)', completed: true, tag: 'Vault' },
-    { id: '2', title: 'Approve child allowance request', completed: false, tag: 'Requests' },
-    { id: '3', title: 'Set up auto-pay for utility bills', completed: true, tag: 'Bills' },
-    { id: '4', title: 'Auto-transfer ₹10,000 to Savings', completed: false, tag: 'Savings' },
-    { id: '5', title: 'Review Q3 financial budget allocations', completed: false, tag: 'Audit' },
-  ]);
+  const { isDemoMode } = useFamilyFinance();
+  const [planTasks, setPlanTasks] = useState<Array<{ id: string; title: string; completed: boolean; tag: string }>>(() => {
+    if (!isDemoMode) return [];
+    return [
+      { id: '1', title: 'Rebalance Emergency Vault (₹2.5L)', completed: true, tag: 'Vault' },
+      { id: '2', title: 'Approve child allowance request', completed: false, tag: 'Requests' },
+      { id: '3', title: 'Set up auto-pay for utility bills', completed: true, tag: 'Bills' },
+    ];
+  });
 
   const [newTaskInput, setNewTaskInput] = useState('');
   const [convertedGoalMsg, setConvertedGoalMsg] = useState<string>('');
@@ -287,15 +289,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Pending Requests</div>
               </div>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => openViewSettingsModal('dashboard')}
-                title="Dashboard Settings"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: '12px', padding: '0.45rem 0.75rem' }}
-              >
-                <Settings size={14} />
-                <span>Settings</span>
-              </button>
             </div>
           </div>
 
@@ -552,15 +545,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 Authorized shared family ledger • Private transactions strictly excluded
               </p>
             </div>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => openViewSettingsModal('dashboard')}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: '12px', padding: '0.45rem 0.85rem' }}
-              title="Dashboard Settings"
-            >
-              <Settings size={14} />
-              <span>Dashboard Settings</span>
-            </button>
           </div>
 
           <div className="finova-grid-3col">
@@ -957,44 +941,50 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {scopedTransactions.slice(0, 5).map(tx => {
-                  const isExp = tx.type === 'expense';
-                  return (
-                    <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {scopedTransactions.length === 0 ? (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem 0' }}>
+                    No recent transactions found.
+                  </div>
+                ) : (
+                  scopedTransactions.slice(0, 7).map(tx => {
+                    const isExp = tx.type === 'expense';
+                    return (
+                      <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div
+                            className="pastel-icon-box"
+                            style={{
+                              background: isExp ? '#FEF2F2' : '#D5F2E2',
+                              color: isExp ? 'var(--coral-accent)' : 'var(--mint-primary)',
+                            }}
+                          >
+                            {isExp ? <ArrowDownLeft size={17} /> : <ArrowUpRight size={17} />}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-main)' }}>
+                              {tx.description}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {formatDate(tx.transaction_date)} • {tx.payment_method || 'UPI'}
+                            </div>
+                          </div>
+                        </div>
+
                         <div
-                          className="pastel-icon-box"
                           style={{
-                            background: isExp ? '#FEF2F2' : '#D5F2E2',
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 700,
+                            fontSize: '0.9rem',
                             color: isExp ? 'var(--coral-accent)' : 'var(--mint-primary)',
                           }}
                         >
-                          {isExp ? <ArrowDownLeft size={17} /> : <ArrowUpRight size={17} />}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-main)' }}>
-                            {tx.description}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            {formatDate(tx.transaction_date)} • {tx.payment_method || 'UPI'}
-                          </div>
+                          {isExp ? '-' : '+'}
+                          {formatPaise(tx.amount)}
                         </div>
                       </div>
-
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontWeight: 700,
-                          fontSize: '0.9rem',
-                          color: isExp ? 'var(--coral-accent)' : 'var(--mint-primary)',
-                        }}
-                      >
-                        {isExp ? '-' : '+'}
-                        {formatPaise(tx.amount)}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

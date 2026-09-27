@@ -3,12 +3,12 @@ import { AuthLayout } from "./AuthLayout";
 import { useRouter } from "../../router/Router";
 import { useAuth } from "../../context/AuthContext";
 import { useFamilyFinance } from "../../context/FamilyFinanceContext";
-import { registerUser, loginWithGoogle, getFirebaseErrorMessage } from "../../services/authService";
+import { registerUser, loginWithGoogle, loginWithGitHub, getFirebaseErrorMessage } from "../../services/authService";
 import { Eye, EyeOff, AlertCircle, Shield, IndianRupee, ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
+import { TermsModal } from "./TermsModal";
 
 export const RegisterPage: React.FC = () => {
   const { navigate } = useRouter();
-  const { loginAsDemoMember } = useAuth();
   const { switchMember } = useFamilyFinance();
 
   const [firstName, setFirstName] = useState("");
@@ -24,7 +24,11 @@ export const RegisterPage: React.FC = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const [isGithubSubmitting, setIsGithubSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [termsTab, setTermsTab] = useState<'terms' | 'privacy'>('terms');
 
   const isLengthValid = password.length >= 8;
   const isMixValid = /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
@@ -34,13 +38,31 @@ export const RegisterPage: React.FC = () => {
     setErrorMessage("");
     setIsGoogleSubmitting(true);
     try {
-      await loginWithGoogle();
-      navigate("/dashboard");
+      const res = await loginWithGoogle();
+      if (res) {
+        switchMember(res.id);
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       console.error("Google sign up failed:", err);
       setErrorMessage(getFirebaseErrorMessage(err));
-    } finally {
       setIsGoogleSubmitting(false);
+    }
+  };
+
+  const handleGitHubSignUp = async () => {
+    setErrorMessage("");
+    setIsGithubSubmitting(true);
+    try {
+      const res = await loginWithGitHub();
+      if (res) {
+        switchMember(res.id);
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      console.error("GitHub sign up failed:", err);
+      setErrorMessage(getFirebaseErrorMessage(err));
+      setIsGithubSubmitting(false);
     }
   };
 
@@ -142,49 +164,7 @@ export const RegisterPage: React.FC = () => {
         </p>
       </div>
 
-      {/* QA Demo Bypass Banner */}
-      <div
-        style={{
-          background: "#ECFDF5",
-          border: "1.5px dashed #059669",
-          borderRadius: "12px",
-          padding: "0.85rem 1rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "0.75rem",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Sparkles size={16} color="#059669" />
-          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "#065F46" }}>
-            Testing the app? No registration required.
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={async () => {
-            await loginAsDemoMember("mem-raj");
-            switchMember("mem-raj");
-            navigate("/dashboard");
-          }}
-          style={{
-            background: "#059669",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            padding: "0.4rem 0.8rem",
-            fontSize: "0.78rem",
-            fontWeight: 700,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-            boxShadow: "0 1px 3px rgba(5, 150, 105, 0.2)",
-          }}
-        >
-          ⚡ Demo Family
-        </button>
-      </div>
+
 
       {errorMessage && (
         <div
@@ -340,7 +320,24 @@ export const RegisterPage: React.FC = () => {
             onChange={(e) => setAgreeTerms(e.target.checked)}
             style={{ width: "16px", height: "16px", accentColor: "#059669" }}
           />
-          <span>I agree to the <a href="#" style={{ color: "#059669", textDecoration: "underline", fontWeight: 500 }}>Terms of Service</a> and <a href="#" style={{ color: "#059669", textDecoration: "underline", fontWeight: 500 }}>Privacy Policy</a>.</span>
+          <span>
+            I agree to the{" "}
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); setTermsTab('terms'); setIsTermsOpen(true); }}
+              style={{ background: "none", border: "none", color: "#059669", textDecoration: "underline", fontWeight: 600, padding: 0, cursor: "pointer", fontSize: "0.85rem" }}
+            >
+              Terms & Conditions
+            </button>{" "}
+            and{" "}
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); setTermsTab('privacy'); setIsTermsOpen(true); }}
+              style={{ background: "none", border: "none", color: "#059669", textDecoration: "underline", fontWeight: 600, padding: 0, cursor: "pointer", fontSize: "0.85rem" }}
+            >
+              Privacy Policy
+            </button>.
+          </span>
         </label>
 
         {/* Submit Button */}
@@ -408,6 +405,8 @@ export const RegisterPage: React.FC = () => {
         </button>
         <button
           type="button"
+          onClick={handleGitHubSignUp}
+          disabled={isSubmitting || isGoogleSubmitting || isGithubSubmitting}
           style={{ 
             flex: 1, 
             padding: "0.75rem", 
@@ -427,12 +426,32 @@ export const RegisterPage: React.FC = () => {
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
           </svg>
-          Continue with GitHub
+          {isGithubSubmitting ? "Redirecting..." : "Continue with GitHub"}
         </button>
       </div>
 
+      {/* Terms & Conditions Agreement Notice */}
+      <div style={{ marginTop: "1.5rem", padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "0.78rem", color: "#64748B", textAlign: "center", lineHeight: 1.5 }}>
+        By continuing, you agree to our{" "}
+        <button
+          type="button"
+          onClick={() => { setTermsTab('terms'); setIsTermsOpen(true); }}
+          style={{ background: "none", border: "none", color: "#059669", fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "0.78rem" }}
+        >
+          Terms & Conditions
+        </button>{" "}
+        and{" "}
+        <button
+          type="button"
+          onClick={() => { setTermsTab('privacy'); setIsTermsOpen(true); }}
+          style={{ background: "none", border: "none", color: "#059669", fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "0.78rem" }}
+        >
+          Privacy Policy
+        </button>.
+      </div>
+
       {/* Login Link */}
-      <div style={{ marginTop: "1.75rem", textAlign: "center", fontSize: "0.95rem", color: "#6B7280" }}>
+      <div style={{ marginTop: "1.25rem", textAlign: "center", fontSize: "0.95rem", color: "#6B7280" }}>
         Already have an account?{" "}
         <button
           type="button"
@@ -442,6 +461,13 @@ export const RegisterPage: React.FC = () => {
           Sign in
         </button>
       </div>
+
+      {/* Terms & Conditions Modal */}
+      <TermsModal
+        isOpen={isTermsOpen}
+        onClose={() => setIsTermsOpen(false)}
+        defaultTab={termsTab}
+      />
     </AuthLayout>
   );
 };

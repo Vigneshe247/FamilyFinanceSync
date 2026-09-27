@@ -39,6 +39,7 @@ import {
   User,
   Users,
   Shield,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface TopMenubarProps {
@@ -588,6 +589,15 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
           {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
         </button>
 
+        {/* Upload / Import Data Circle Button */}
+        <button
+          className="action-circle-btn"
+          onClick={() => onOpenImportModal?.()}
+          title="Upload / Import Historical Ledger (.csv, .xlsx, .pdf)"
+        >
+          <UploadCloud size={16} />
+        </button>
+
         {/* Profile Circle Button (Section 3) */}
         <button
           className="action-circle-btn"
@@ -602,17 +612,11 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
           <User size={16} />
         </button>
 
-        {/* View & System Settings Circle Button (Placed beside Profile) */}
+        {/* Main Family Workspace Settings Button (Primary) */}
         <button
           className="action-circle-btn"
-          onClick={() => {
-            if (onOpenViewSettings) {
-              onOpenViewSettings();
-            } else {
-              setActiveTab('control_center');
-            }
-          }}
-          title="View & System Settings"
+          onClick={() => setActiveTab('control_center')}
+          title="Main Family Workspace Settings (Control Center)"
           style={{
             borderColor: activeTab === 'control_center' ? 'var(--mint-primary)' : undefined,
             background: activeTab === 'control_center' ? 'rgba(5, 150, 105, 0.12)' : undefined,
@@ -620,6 +624,19 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
           }}
         >
           <Settings size={16} />
+        </button>
+
+        {/* Secondary View & Display Settings Button */}
+        <button
+          className="action-circle-btn"
+          onClick={() => {
+            if (onOpenViewSettings) {
+              onOpenViewSettings();
+            }
+          }}
+          title="Secondary View Settings & Preferences (Display, Density & Sorting)"
+        >
+          <SlidersHorizontal size={16} />
         </button>
 
         {/* Role Switcher & Member Menu (Far Right) */}
@@ -792,60 +809,64 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                 </button>
               </div>
 
-              {/* Role Perspective Switcher for Testing (Section 26 & 38) */}
-              <div
-                style={{
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--text-muted)',
-                  padding: '0.4rem 0.5rem 0.25rem',
-                  borderTop: '1px solid var(--border-subtle)',
-                }}
-              >
-                Switch Role Perspective
-              </div>
+              {/* Role Perspective Switcher for Testing - Demo Mode Only */}
+              {isDemoMode && (
+                <>
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      color: 'var(--text-muted)',
+                      padding: '0.4rem 0.5rem 0.25rem',
+                      borderTop: '1px solid var(--border-subtle)',
+                    }}
+                  >
+                    Switch Role Perspective
+                  </div>
 
-              <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
-                {members.map(member => {
-                  const isSelected = member.id === currentMember.id;
-                  return (
-                    <div
-                      key={member.id}
-                      onClick={() => {
-                        switchMember(member.id);
-                        setRoleDropdownOpen(false);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '0.4rem 0.5rem',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        background: isSelected ? 'var(--bg-canvas)' : 'transparent',
-                        transition: 'background 0.15s ease',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <img
-                          src={member.user.avatar_url}
-                          alt={member.user.name}
-                          style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
-                        />
-                        <div>
-                          <div style={{ fontSize: '0.78rem', fontWeight: 600 }}>{member.user.name}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                            {ROLE_DISPLAY_NAMES[normalizeRole(member.role)] || member.role.replace('_', ' ')}
+                  <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                    {members.map(member => {
+                      const isSelected = member.id === currentMember.id;
+                      return (
+                        <div
+                          key={member.id}
+                          onClick={() => {
+                            switchMember(member.id);
+                            setRoleDropdownOpen(false);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.4rem 0.5rem',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            background: isSelected ? 'var(--bg-canvas)' : 'transparent',
+                            transition: 'background 0.15s ease',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <img
+                              src={member.user.avatar_url}
+                              alt={member.user.name}
+                              style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                            <div>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 600 }}>{member.user.name}</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                {ROLE_DISPLAY_NAMES[normalizeRole(member.role)] || member.role.replace('_', ' ')}
+                              </div>
+                            </div>
                           </div>
+                          {isSelected && <Check size={14} color="var(--mint-primary)" />}
                         </div>
-                      </div>
-                      {isSelected && <Check size={14} color="var(--mint-primary)" />}
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

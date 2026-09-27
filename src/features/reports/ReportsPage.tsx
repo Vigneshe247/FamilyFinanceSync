@@ -269,15 +269,6 @@ export const ReportsPage: React.FC = () => {
           <button className="btn btn-secondary btn-sm" onClick={handleExportFullReport}>
             <Download size={14} /> Export Statement
           </button>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('reports')}
-            title="Reports & Analytics Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

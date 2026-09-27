@@ -17,13 +17,18 @@ import { supabase, supabaseAuthService } from "../services/supabase";
 import { FirestoreUserDocument } from "../types/firestore";
 import { DEMO_MEMBERS } from "../data/seedData";
 
+import { getUserMemberships, UserFamilyMembership } from "../services/familyService";
+
 interface AuthContextType {
   user: any;
   userProfile: FirestoreUserDocument | null;
+  memberships: UserFamilyMembership[];
+  familyCount: number;
   loading: boolean;
   isAuthenticated: boolean;
   isEmailVerified: boolean;
   reloadUser: () => Promise<boolean>;
+  refreshMemberships: () => Promise<UserFamilyMembership[]>;
   logout: () => Promise<void>;
   devSimulateVerify: () => Promise<void>;
   loginAsDemoMember: (memberId?: string) => Promise<void>;
@@ -32,10 +37,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   userProfile: null,
+  memberships: [],
+  familyCount: 0,
   loading: true,
   isAuthenticated: false,
   isEmailVerified: false,
   reloadUser: async () => false,
+  refreshMemberships: async () => [],
   logout: async () => {},
   devSimulateVerify: async () => {},
   loginAsDemoMember: async () => {},
@@ -44,52 +52,48 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<FirestoreUserDocument | null>(null);
+  const [memberships, setMemberships] = useState<UserFamilyMembership[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [localVerifiedOverride, setLocalVerifiedOverride] = useState<boolean>(false);
 
+  const refreshMemberships = async (): Promise<UserFamilyMembership[]> => {
+    if (!user) {
+      setMemberships([]);
+      return [];
+    }
+    const mems = await getUserMemberships(user.id || user.uid);
+    setMemberships(mems);
+    return mems;
+  };
+
   useEffect(() => {
     // 1. Check Supabase session first
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session && session.user) {
         const sbUser = session.user;
         setUser(sbUser);
-        const nameParts = (sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || "Family Head").split(" ");
+        const nameParts = (sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || "Member User").split(" ");
         setUserProfile({
           uid: sbUser.id,
           firstName: nameParts[0] || "User",
           lastName: nameParts.slice(1).join(" ") || "",
-          displayName: sbUser.user_metadata?.full_name || nameParts[0] || "Family Head",
+          displayName: sbUser.user_metadata?.full_name || nameParts[0] || "Member User",
           email: sbUser.email || "",
           mobile: sbUser.phone || "",
           photoURL: sbUser.user_metadata?.avatar_url || "",
           emailVerified: true,
-          familyId: `family_${sbUser.id.slice(0, 8)}`,
+          familyId: "",
           status: "active",
           createdAt: sbUser.created_at,
           updatedAt: new Date().toISOString(),
         });
+        const mems = await getUserMemberships(sbUser.id);
+        setMemberships(mems);
         setLoading(false);
       } else {
-        // Fallback to local mock user for demo mode
-        const initialMock = getCurrentMockUser();
-        if (initialMock) {
-          setUser(initialMock);
-          const nameParts = (initialMock.displayName || "Family Head").split(" ");
-          setUserProfile({
-            uid: initialMock.uid,
-            firstName: nameParts[0] || "User",
-            lastName: nameParts.slice(1).join(" ") || "",
-            displayName: initialMock.displayName || "Family Head",
-            email: initialMock.email || "",
-            mobile: initialMock.phoneNumber || "",
-            photoURL: initialMock.photoURL || "",
-            emailVerified: Boolean(initialMock.emailVerified),
-            familyId: `family_${initialMock.uid.slice(0, 8)}`,
-            status: "active",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        }
+        setUser(null);
+        setUserProfile(null);
+        setMemberships([]);
         setLoading(false);
       }
     });
@@ -99,24 +103,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session && session.user) {
         const sbUser = session.user;
         setUser(sbUser);
-        const nameParts = (sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || "Family Head").split(" ");
+        const fullName = sbUser.user_metadata?.full_name || sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || "Member User";
+        const nameParts = fullName.split(" ");
+
         setUserProfile({
           uid: sbUser.id,
           firstName: nameParts[0] || "User",
           lastName: nameParts.slice(1).join(" ") || "",
-          displayName: sbUser.user_metadata?.full_name || nameParts[0] || "Family Head",
+          displayName: fullName,
           email: sbUser.email || "",
           mobile: sbUser.phone || "",
           photoURL: sbUser.user_metadata?.avatar_url || "",
           emailVerified: true,
-          familyId: `family_${sbUser.id.slice(0, 8)}`,
+          familyId: "",
           status: "active",
           createdAt: sbUser.created_at,
           updatedAt: new Date().toISOString(),
         });
+        const mems = await getUserMemberships(sbUser.id);
+        setMemberships(mems);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserProfile(null);
+        setMemberships([]);
       }
     });
 
@@ -230,10 +239,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         userProfile,
+        memberships,
+        familyCount: memberships.length,
         loading,
         isAuthenticated,
         isEmailVerified,
         reloadUser,
+        refreshMemberships,
         logout,
         devSimulateVerify,
         loginAsDemoMember,

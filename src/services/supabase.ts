@@ -9,12 +9,13 @@ import { createClient, User as SupabaseUser, Session } from '@supabase/supabase-
 const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL ||
   import.meta.env.NEXT_PUBLIC_SUPABASE_URL ||
-  'https://srabbqfnpibohwdzjfuo.supabase.co';
+  'https://fwhyqhgilvbdxppiiirr.supabase.co';
 
 const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
   import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  'sb_publishable_7kLSYd9oAWHuNsyxSK5yQw_NnQ3XppV';
+  'sb_publishable_Uaq6TUPUXJiyTwwvhIvNkw__jFzIsc3';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -190,6 +191,9 @@ export const supabaseAuthService = {
         },
       });
       if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
       return { success: true, data };
     } catch (err: any) {
       console.error('Supabase Google OAuth error:', err);
@@ -206,6 +210,9 @@ export const supabaseAuthService = {
         },
       });
       if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
       return { success: true, data };
     } catch (err: any) {
       console.error('Supabase GitHub OAuth error:', err);

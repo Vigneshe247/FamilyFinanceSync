@@ -56,15 +56,6 @@ export const RecurringPage: React.FC = () => {
             <BellRing size={14} />
             <span>Active Reminders Enabled</span>
           </div>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('recurring')}
-            title="Recurring Bills Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

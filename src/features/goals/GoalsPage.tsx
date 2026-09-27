@@ -127,15 +127,6 @@ export const GoalsPage: React.FC = () => {
               <Plus size={15} /> Create Savings Goal
             </button>
           )}
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('goals')}
-            title="Goals View Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

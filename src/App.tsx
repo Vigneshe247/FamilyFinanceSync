@@ -7,11 +7,16 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AccessRestricted } from './components/auth/AccessRestricted';
 import { TopMenubar } from './components/layout/TopMenubar';
 
-// Auth Pages
+// Auth Pages & Family Setup
 import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { VerifyEmailPage } from './components/auth/VerifyEmailPage';
 import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
+import { FamilySetupPage } from './features/family/FamilySetupPage';
+import { FamilySelectPage } from './features/family/FamilySelectPage';
+import { FamilyCreatePage } from './features/family/FamilyCreatePage';
+import { FamilyJoinPage } from './features/family/FamilyJoinPage';
+import { FamilyInvitePage } from './features/family/FamilyInvitePage';
 
 // Feature Views (Section 37: Obsolete features cleanly removed)
 import { DashboardPage } from './features/dashboard/DashboardPage';
@@ -94,7 +99,7 @@ const tabToPathMap: Record<string, string> = {
 
 const AppInner: React.FC = () => {
   const { currentPath, navigate } = useRouter();
-  const { isAuthenticated, isEmailVerified } = useAuth();
+  const { isAuthenticated, isEmailVerified, familyCount, loading } = useAuth();
 
   const [activeTab, setActiveTabState] = useState<string>(() => {
     return pathToTabMap[currentPath] || 'dashboard';
@@ -136,9 +141,16 @@ const AppInner: React.FC = () => {
     setNewTxModalOpen(true);
   };
 
-  // ================= 1. PUBLIC ROUTES =================
+  // ================= 1. PUBLIC & SETUP ROUTES =================
   if (currentPath === '/login') {
     if (isAuthenticated && isEmailVerified) {
+      if (familyCount === 0) {
+        navigate('/family/setup');
+        return null;
+      } else if (familyCount > 1) {
+        navigate('/family/select');
+        return null;
+      }
       navigate('/dashboard');
       return null;
     }
@@ -147,6 +159,10 @@ const AppInner: React.FC = () => {
 
   if (currentPath === '/register') {
     if (isAuthenticated && isEmailVerified) {
+      if (familyCount === 0) {
+        navigate('/family/setup');
+        return null;
+      }
       navigate('/dashboard');
       return null;
     }
@@ -159,6 +175,31 @@ const AppInner: React.FC = () => {
 
   if (currentPath === '/forgot-password') {
     return <ForgotPasswordPage />;
+  }
+
+  if (currentPath === '/family/setup') {
+    return <FamilySetupPage />;
+  }
+
+  if (currentPath === '/family/create') {
+    return <FamilyCreatePage />;
+  }
+
+  if (currentPath === '/family/join') {
+    return <FamilyJoinPage />;
+  }
+
+  if (currentPath.startsWith('/family/invite')) {
+    return <FamilyInvitePage />;
+  }
+
+  if (currentPath === '/family/select') {
+    return <FamilySelectPage />;
+  }
+
+  // Force authenticated users with 0 families to complete setup
+  if (isAuthenticated && isEmailVerified && familyCount === 0 && currentPath !== '/demo') {
+    return <FamilySetupPage />;
   }
 
   // ================= 2. AUTHENTICATED APP VIEWS =================

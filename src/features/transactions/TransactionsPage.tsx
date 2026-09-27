@@ -184,15 +184,6 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({ onOpenNewTx 
               </button>
             </>
           )}
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('transactions')}
-            title="Transactions View Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

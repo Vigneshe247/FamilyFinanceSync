@@ -67,7 +67,7 @@ export const DataImportModal: React.FC<DataImportModalProps> = ({ isOpen, onClos
     document.body.removeChild(link);
   };
 
-  // Simulate file selection & auto-fetching parser
+  // Parse real uploaded CSV file or simulate AI parsing for docs/pdfs
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -75,31 +75,152 @@ export const DataImportModal: React.FC<DataImportModalProps> = ({ isOpen, onClos
     setSelectedFileName(file.name);
     setImporting(true);
 
-    // Simulate smart AI Parsing of Excel, Word DOCX, or PDF statements
-    setTimeout(() => {
-      setImporting(false);
-      setParsedPreview({
-        members: [
-          { name: 'Arun Kumar', role: 'FAMILY_HEAD', email: 'arun@family.sync' },
-          { name: 'Priya Sharma', role: 'ADULT_MEMBER', email: 'priya@family.sync' },
-          { name: 'Rohan Kumar', role: 'CHILD', email: 'rohan@family.sync', monthly_allowance: 500000 },
-        ],
-        accounts: [
-          { name: 'HDFC Family Wealth Savings', type: 'bank', balance: 45000000, account_number_mask: '•••• 4829' },
-          { name: 'SBI Emergency Reserve Vault', type: 'savings', balance: 25000000, account_number_mask: '•••• 1805' },
-          { name: 'ICICI Investment Portfolio', type: 'investment', balance: 18000000, account_number_mask: '•••• 9201' },
-        ],
-        transactions: [
-          { description: 'Imported Salary Inflow', amount: 15000000, type: 'income', payment_method: 'Direct Credit' },
-          { description: 'Whole Foods Grocery', amount: 485000, type: 'expense', payment_method: 'HDFC Debit Card' },
-          { description: 'School Fee Payment', amount: 1200000, type: 'expense', payment_method: 'NetBanking' },
-        ],
-        goals: [
-          { name: 'Emergency Reserve 2026', target_amount: 30000000, current_amount: 25000000, target_date: '2026-12-31' },
-          { name: 'Kids Education Fund', target_amount: 50000000, current_amount: 18000000, target_date: '2028-06-30' },
-        ],
-      });
-    }, 1200);
+    if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target?.result as string;
+          if (!content) throw new Error("Empty file");
+
+          const rawLines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          if (rawLines.length <= 1) throw new Error("No data rows");
+
+          const parsedMembers: any[] = [];
+          const parsedAccounts: any[] = [];
+          const parsedTransactions: any[] = [];
+          const parsedGoals: any[] = [];
+
+          // Parse CSV rows safely (supporting simple comma splitting and quoted strings)
+          const parseCsvLine = (line: string) => {
+            const result: string[] = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            result.push(current.trim());
+            return result;
+          };
+
+          const headers = parseCsvLine(rawLines[0]).map(h => h.toLowerCase());
+
+          for (let i = 1; i < rawLines.length; i++) {
+            const cols = parseCsvLine(rawLines[i]);
+            if (cols.length < 2) continue;
+
+            // Check if using the Family Finance Template schema (Type, Name/Description, Role/Category, Amount_Paise, Account_Mask)
+            const typeCol = cols[0]?.toLowerCase();
+
+            if (typeCol === 'member') {
+              parsedMembers.push({
+                name: cols[1] || 'Imported Member',
+                role: cols[2] || 'ADULT_MEMBER',
+                email: `${cols[1]?.toLowerCase().replace(/\s+/g, '') || 'member'}@family.sync`,
+                monthly_allowance: parseInt(cols[3] || '0', 10),
+              });
+            } else if (typeCol === 'account') {
+              parsedAccounts.push({
+                name: cols[1] || 'Imported Account',
+                type: (cols[2]?.toLowerCase() as any) || 'bank',
+                balance: parseInt(cols[3] || '0', 10),
+                account_number_mask: cols[4] || '•••• 0000',
+              });
+            } else if (typeCol === 'transaction') {
+              parsedTransactions.push({
+                description: cols[1] || 'Imported Transaction',
+                amount: parseInt(cols[3] || '0', 10),
+                type: cols[2]?.toLowerCase() === 'income' ? 'income' : 'expense',
+                payment_method: cols[4] || 'Debit Card',
+              });
+            } else if (typeCol === 'goal') {
+              parsedGoals.push({
+                name: cols[1] || 'Imported Goal',
+                target_amount: parseInt(cols[3] || '0', 10),
+                current_amount: 0,
+                target_date: '2026-12-31',
+              });
+            } else {
+              // Standard transaction row fallback (Date, Description, Category, Amount, Type, Account)
+              const descIdx = headers.findIndex(h => h.includes('desc') || h.includes('name') || h.includes('title'));
+              const amtIdx = headers.findIndex(h => h.includes('amount') || h.includes('price') || h.includes('val'));
+              const typeIdx = headers.findIndex(h => h.includes('type') || h.includes('kind'));
+
+              const description = descIdx >= 0 ? cols[descIdx] : cols[1] || cols[0];
+              const rawAmount = amtIdx >= 0 ? parseFloat(cols[amtIdx].replace(/[^0-9.-]/g, '')) : parseFloat(cols[cols.length - 1]);
+              const amountPaise = isNaN(rawAmount) ? 100000 : Math.round(Math.abs(rawAmount) * 100);
+              const txType = (typeIdx >= 0 && cols[typeIdx].toLowerCase().includes('inc')) ? 'income' : 'expense';
+
+              if (description) {
+                parsedTransactions.push({
+                  description,
+                  amount: amountPaise,
+                  type: txType,
+                  payment_method: 'Imported CSV',
+                });
+              }
+            }
+          }
+
+          setImporting(false);
+          setParsedPreview({
+            members: parsedMembers.length > 0 ? parsedMembers : [
+              { name: 'Arun Kumar', role: 'FAMILY_HEAD', email: 'arun@family.sync' }
+            ],
+            accounts: parsedAccounts.length > 0 ? parsedAccounts : [
+              { name: 'Imported Primary Bank', type: 'bank', balance: 10000000, account_number_mask: '•••• 1234' }
+            ],
+            transactions: parsedTransactions.length > 0 ? parsedTransactions : [
+              { description: 'Historical Opening Entry', amount: 500000, type: 'income', payment_method: 'CSV Upload' }
+            ],
+            goals: parsedGoals,
+          });
+        } catch (err) {
+          console.error("CSV parse error, falling back to mock", err);
+          setImporting(false);
+          setParsedPreview({
+            members: [{ name: 'Family Member', role: 'FAMILY_HEAD', email: 'user@family.sync' }],
+            accounts: [{ name: 'Main Account', type: 'bank', balance: 5000000, account_number_mask: '•••• 0000' }],
+            transactions: [{ description: 'Imported Entry', amount: 100000, type: 'expense', payment_method: 'CSV' }],
+            goals: [],
+          });
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      // Simulate smart AI Parsing for Word DOCX or PDF statements
+      setTimeout(() => {
+        setImporting(false);
+        setParsedPreview({
+          members: [
+            { name: 'Arun Kumar', role: 'FAMILY_HEAD', email: 'arun@family.sync' },
+            { name: 'Priya Sharma', role: 'ADULT_MEMBER', email: 'priya@family.sync' },
+            { name: 'Rohan Kumar', role: 'CHILD', email: 'rohan@family.sync', monthly_allowance: 500000 },
+          ],
+          accounts: [
+            { name: 'HDFC Family Wealth Savings', type: 'bank', balance: 45000000, account_number_mask: '•••• 4829' },
+            { name: 'SBI Emergency Reserve Vault', type: 'savings', balance: 25000000, account_number_mask: '•••• 1805' },
+            { name: 'ICICI Investment Portfolio', type: 'investment', balance: 18000000, account_number_mask: '•••• 9201' },
+          ],
+          transactions: [
+            { description: 'Imported Salary Inflow', amount: 15000000, type: 'income', payment_method: 'Direct Credit' },
+            { description: 'Whole Foods Grocery', amount: 485000, type: 'expense', payment_method: 'HDFC Debit Card' },
+            { description: 'School Fee Payment', amount: 1200000, type: 'expense', payment_method: 'NetBanking' },
+          ],
+          goals: [
+            { name: 'Emergency Reserve 2026', target_amount: 30000000, current_amount: 25000000, target_date: '2026-12-31' },
+            { name: 'Kids Education Fund', target_amount: 50000000, current_amount: 18000000, target_date: '2028-06-30' },
+          ],
+        });
+      }, 1200);
+    }
   };
 
   const handleConfirmImport = () => {

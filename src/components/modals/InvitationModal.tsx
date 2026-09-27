@@ -1,10 +1,11 @@
 /* =========================================================
    FAMILY INVITATION GENERATOR MODAL (Module 5)
-   Generates secure shareable invite links, 6-digit codes & QR references
+   Generates secure shareable invite links, family codes & sends Resend emails
    ========================================================= */
 
 import React, { useState } from 'react';
 import { useFamilyFinance } from '../../context/FamilyFinanceContext';
+import { sendFamilyInvitationToken } from '../../services/familyService';
 import { SystemRoleType } from '../../types';
 import {
   X,
@@ -15,8 +16,9 @@ import {
   ShieldCheck,
   Send,
   Sparkles,
-  QrCode,
   Clock,
+  Mail,
+  Loader2,
 } from 'lucide-react';
 
 interface InvitationModalProps {
@@ -30,6 +32,8 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
   const [role, setRole] = useState<SystemRoleType>('spouse');
   const [email, setEmail] = useState('');
   const [allowanceInput, setAllowanceInput] = useState('2000');
+  const [isSending, setIsSending] = useState(false);
+  const [emailSentNotice, setEmailSentNotice] = useState(false);
   const [generatedInvite, setGeneratedInvite] = useState<{
     code: string;
     link: string;
@@ -39,19 +43,46 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
-  const handleGenerate = (e: React.FormEvent) => {
+  const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const inv = createInvitation(role, email || undefined);
-    setGeneratedInvite({
-      code: inv.invite_code,
-      link: inv.invite_link,
-      expiresAt: new Date(inv.expires_at).toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-    });
+    setIsSending(true);
+    setEmailSentNotice(false);
+
+    try {
+      const inv = createInvitation(role, email || undefined);
+      let inviteLink = inv.invite_link;
+      let inviteCode = inv.invite_code;
+
+      if (email.trim() && family.id) {
+        const tokenRes = await sendFamilyInvitationToken({
+          familyId: family.id,
+          familyName: family.name,
+          invitedEmail: email.trim(),
+          inviterName: currentMember.user.name,
+        });
+
+        if (tokenRes.success && tokenRes.inviteToken) {
+          inviteLink = `${window.location.origin}/family/invite/${tokenRes.inviteToken}`;
+          if (tokenRes.familyCode) inviteCode = tokenRes.familyCode;
+          setEmailSentNotice(true);
+        }
+      }
+
+      setGeneratedInvite({
+        code: inviteCode,
+        link: inviteLink,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      });
+    } catch (err) {
+      console.warn('Invitation error:', err);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleCopyLink = () => {
@@ -114,7 +145,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
               </div>
 
               <div>
-                <label className="label">Member Email (Optional for direct invite)</label>
+                <label className="label">Member Email (For automatic invitation email)</label>
                 <input
                   type="email"
                   className="input"
@@ -124,7 +155,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 />
               </div>
 
-              {role === 'CHILD' && (
+              {role === 'child' && (
                 <div>
                   <label className="label">Initial Monthly Allowance (₹ INR)</label>
                   <input
@@ -156,16 +187,24 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
               </div>
 
               <div className="modal-footer" style={{ padding: 0 }}>
-                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSending}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ gap: '0.5rem' }}>
-                  <Sparkles size={16} /> Generate Invite Pass
+                <button type="submit" className="btn btn-primary" style={{ gap: '0.5rem' }} disabled={isSending}>
+                  {isSending ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                  {isSending ? 'Sending Invitation...' : 'Generate & Send Invite'}
                 </button>
               </div>
             </form>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {emailSentNotice && (
+                <div style={{ padding: '0.75rem 1rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', color: '#166534', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Mail size={16} style={{ color: '#16A34A', flexShrink: 0 }} />
+                  <span>Invitation email has been sent successfully to <strong>{email}</strong>!</span>
+                </div>
+              )}
+
               <div
                 style={{
                   background: 'var(--mint-light)',
@@ -176,13 +215,13 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 }}
               >
                 <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--mint-primary)', fontWeight: 700, letterSpacing: '0.06em' }}>
-                  6-Digit Invitation Security Code
+                  Family Invitation Code
                 </div>
                 <div
                   style={{
-                    fontSize: '2.2rem',
+                    fontSize: '2rem',
                     fontWeight: 900,
-                    letterSpacing: '0.3em',
+                    letterSpacing: '0.15em',
                     color: 'var(--text-main)',
                     fontFamily: 'var(--font-mono)',
                     margin: '0.4rem 0',
@@ -217,7 +256,10 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setGeneratedInvite(null)}
+                  onClick={() => {
+                    setGeneratedInvite(null);
+                    setEmailSentNotice(false);
+                  }}
                   style={{ flex: 1 }}
                 >
                   Generate Another Code

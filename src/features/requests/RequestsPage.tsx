@@ -103,15 +103,6 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({ onOpenNewRequest }) 
           <button className="btn btn-primary btn-sm" onClick={onOpenNewRequest}>
             <Plus size={15} /> Submit New Request
           </button>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('requests')}
-            title="Requests View Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

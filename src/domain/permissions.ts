@@ -118,11 +118,11 @@ export interface PermissionContext {
   roleId: RoleId;
   isOwner: boolean;
   /** Family-scoped overrides of a role's permissions. */
-  familyRoleOverrides?: Record<string, Partial<Record<PermissionKey, boolean>>>;
+  familyRoleOverrides?: Record<string, any>;
   /** Custom role permissions. */
-  customRolePermissions?: Record<string, PermissionKey[] | Partial<Record<PermissionKey, boolean>>>;
+  customRolePermissions?: Record<string, any>;
   /** Member-scoped overrides. */
-  memberOverrides?: Partial<Record<PermissionKey, boolean>>;
+  memberOverrides?: Partial<Record<PermissionKey, boolean>> | any;
 }
 
 /**

@@ -173,7 +173,7 @@ export const supabaseDataService = {
 
       // Log system audit action
       await this.logAudit({
-        family_id: tx.family_id,
+        family_id: tx.family_id || '',
         user_id: tx.user_id,
         action: 'TRANSACTION_CREATED',
         entity_type: 'transaction',

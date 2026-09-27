@@ -177,16 +177,6 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
               </button>
             </>
           )}
-
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('members')}
-            title="Members View Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 
@@ -530,21 +520,33 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
 
                   {/* Role Badge / Switcher */}
                   <div>
-                    {isHead && !isThisHead ? (
+                    {isHead ? (
                       <select
                         className="select"
-                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', fontWeight: 600 }}
+                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', fontWeight: 700 }}
                         value={m.role}
-                        onChange={e => updateMemberRole(m.id, e.target.value as SystemRoleType)}
+                        onChange={e => {
+                          const newRole = e.target.value as SystemRoleType;
+                          if (newRole === 'FAMILY_HEAD' && !isThisHead) {
+                            if (window.confirm(`Transfer Family Head ownership to ${m.user.name}? You will promote them to Family Head.`)) {
+                              updateMemberRole(m.id, newRole);
+                            }
+                          } else {
+                            updateMemberRole(m.id, newRole);
+                          }
+                        }}
                       >
-                        <option value="spouse">Spouse</option>
-                        <option value="son">Son</option>
-                        <option value="daughter">Daughter</option>
-                        <option value="grandparent">Grand Parent</option>
-                        <option value="viewer">Viewer</option>
+                        <option value="FAMILY_HEAD">👑 Family Head (Owner)</option>
+                        <option value="CO_MANAGER">🛡️ Co-Manager</option>
+                        <option value="ADULT_MEMBER">👤 Adult Member</option>
+                        <option value="spouse">💍 Spouse</option>
+                        <option value="son">👦 Son</option>
+                        <option value="daughter">👧 Daughter</option>
+                        <option value="grandparent">👵 Grand Parent</option>
+                        <option value="viewer">👁️ Viewer (Read Only)</option>
                         {roles.filter(r => r.is_custom).map(r => (
                           <option key={r.id} value={r.id}>
-                            {r.name} (Custom)
+                            ⚙️ {r.name} (Custom)
                           </option>
                         ))}
                       </select>

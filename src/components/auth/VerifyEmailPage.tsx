@@ -14,12 +14,12 @@ import React, { useState } from "react";
 import { AuthLayout } from "./AuthLayout";
 import { useRouter } from "../../router/Router";
 import { useAuth } from "../../context/AuthContext";
-import { resendVerificationEmail, getFirebaseErrorMessage } from "../../services/authService";
+import { resendVerificationEmail, sendWelcomeEmail, getFirebaseErrorMessage } from "../../services/authService";
 import { MailCheck, RefreshCw, Send, ArrowLeft, CheckCircle2, AlertTriangle, ShieldCheck } from "lucide-react";
 
 export const VerifyEmailPage: React.FC = () => {
   const { navigate } = useRouter();
-  const { user, reloadUser, logout, devSimulateVerify } = useAuth();
+  const { user, userProfile, reloadUser, logout, devSimulateVerify } = useAuth();
 
   const [checking, setChecking] = useState(false);
   const [resending, setResending] = useState(false);
@@ -36,9 +36,14 @@ export const VerifyEmailPage: React.FC = () => {
       const isVerified = await reloadUser();
 
       if (isVerified) {
+        // Step 11: Invoke Supabase Edge Function to send welcome email
+        sendWelcomeEmail(userProfile?.firstName).catch(err => {
+          console.error("Welcome email invocation notice:", err);
+        });
+
         setStatusMessage({
           type: "success",
-          text: "Email verified successfully! Loading your family financial workspace...",
+          text: "Email verified successfully! Sending welcome email...",
         });
         setTimeout(() => {
           navigate("/dashboard");
@@ -130,8 +135,8 @@ export const VerifyEmailPage: React.FC = () => {
           <br />
           <strong style={{ color: "var(--text-main)", fontSize: "0.95rem" }}>{emailDisplay}</strong>
           <br />
-          <span style={{ fontSize: "0.82rem" }}>
-            Please verify your email before accessing your family financial workspace.
+          <span style={{ fontSize: "0.82rem", color: "#64748B" }}>
+            Please check your <strong>Inbox</strong> or <strong>Spam / Junk / Promotions</strong> folder.
           </span>
         </p>
 

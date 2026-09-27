@@ -3,13 +3,13 @@ import { AuthLayout } from "./AuthLayout";
 import { useRouter } from "../../router/Router";
 import { useAuth } from "../../context/AuthContext";
 import { useFamilyFinance } from "../../context/FamilyFinanceContext";
-import { loginUser, loginWithGoogle, getFirebaseErrorMessage } from "../../services/authService";
-import { Eye, EyeOff, AlertCircle, Shield, IndianRupee, ArrowRight, Check, Sparkles, Users, Crown } from "lucide-react";
+import { loginUser, loginWithGoogle, loginWithGitHub, getFirebaseErrorMessage } from "../../services/authService";
+import { Eye, EyeOff, AlertCircle, Shield, IndianRupee, ArrowRight, Check, Sparkles, Users, Crown, FileText } from "lucide-react";
+import { TermsModal } from "./TermsModal";
 
 export const LoginPage: React.FC = () => {
   const { navigate } = useRouter();
-  const { user, isEmailVerified, loginAsDemoMember } = useAuth();
-  const { switchMember } = useFamilyFinance();
+  const { user, isEmailVerified } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,20 +17,11 @@ export const LoginPage: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const [isGithubSubmitting, setIsGithubSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleQADemoAccess = async (memberId: string = "mem-raj") => {
-    setIsSubmitting(true);
-    try {
-      await loginAsDemoMember(memberId);
-      switchMember(memberId);
-      navigate("/dashboard");
-    } catch (err) {
-      console.error("QA Demo Login failed:", err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [termsTab, setTermsTab] = useState<'terms' | 'privacy'>('terms');
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,13 +56,30 @@ export const LoginPage: React.FC = () => {
     setIsGoogleSubmitting(true);
 
     try {
-      await loginWithGoogle();
-      navigate("/dashboard");
+      const res = await loginWithGoogle();
+      if (res) {
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       console.error("Google login failed:", err);
       setErrorMessage(getFirebaseErrorMessage(err));
-    } finally {
       setIsGoogleSubmitting(false);
+    }
+  };
+
+  const handleGitHubLogin = async () => {
+    setErrorMessage("");
+    setIsGithubSubmitting(true);
+
+    try {
+      const res = await loginWithGitHub();
+      if (res) {
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      console.error("GitHub login failed:", err);
+      setErrorMessage(getFirebaseErrorMessage(err));
+      setIsGithubSubmitting(false);
     }
   };
 
@@ -128,81 +136,7 @@ export const LoginPage: React.FC = () => {
         </p>
       </div>
 
-      {/* ================= QA DEMO FAMILY TESTING CARD ================= */}
-      <div
-        style={{
-          background: "linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)",
-          border: "2px dashed #059669",
-          borderRadius: "16px",
-          padding: "1.25rem",
-          marginBottom: "1.75rem",
-          boxShadow: "0 4px 14px rgba(5, 150, 105, 0.08)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-            <Sparkles size={18} color="#059669" />
-            <span style={{ fontWeight: 800, fontSize: "0.92rem", color: "#065F46" }}>
-              QA Demo Family (Instant Testing)
-            </span>
-          </div>
-          <span
-            style={{
-              fontSize: "0.68rem",
-              fontWeight: 800,
-              background: "#059669",
-              color: "white",
-              padding: "0.2rem 0.55rem",
-              borderRadius: "9999px",
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-            }}
-          >
-            No Login Needed
-          </span>
-        </div>
 
-        <p style={{ fontSize: "0.8rem", color: "#047857", margin: "0 0 0.85rem 0", lineHeight: 1.4 }}>
-          Jump straight into the platform with pre-loaded accounts, transactions, allowances, and approval requests for testing.
-        </p>
-
-        {/* 1-Click Primary Action Button */}
-        <button
-          type="button"
-          disabled={isSubmitting}
-          onClick={() => handleQADemoAccess("mem-raj")}
-          style={{
-            width: "100%",
-            padding: "0.85rem 1.25rem",
-            background: "#059669",
-            color: "white",
-            border: "none",
-            borderRadius: "12px",
-            fontWeight: 700,
-            fontSize: "1rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.55rem",
-            cursor: "pointer",
-            boxShadow: "0 3px 10px rgba(5, 150, 105, 0.25)",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <Sparkles size={18} />
-          <span>Demo Family</span>
-          <ArrowRight size={18} />
-        </button>
-      </div>
-
-      {/* OR Divider */}
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", margin: "0 0 1.5rem 0" }}>
-        <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
-        <span style={{ fontSize: "0.72rem", color: "#9CA3AF", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          Or Sign In With Account
-        </span>
-        <div style={{ flex: 1, height: "1px", background: "#E5E7EB" }} />
-      </div>
 
       {errorMessage && (
         <div
@@ -377,6 +311,8 @@ export const LoginPage: React.FC = () => {
         </button>
         <button
           type="button"
+          onClick={handleGitHubLogin}
+          disabled={isSubmitting || isGoogleSubmitting || isGithubSubmitting}
           style={{ 
             width: "100%", 
             padding: "0.75rem", 
@@ -396,12 +332,32 @@ export const LoginPage: React.FC = () => {
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
           </svg>
-          Continue with GitHub
+          {isGithubSubmitting ? "Redirecting..." : "Continue with GitHub"}
         </button>
       </div>
 
+      {/* Terms & Conditions Agreement Notice */}
+      <div style={{ marginTop: "1.5rem", padding: "0.85rem", background: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "0.78rem", color: "#64748B", textAlign: "center", lineHeight: 1.5 }}>
+        By continuing, you agree to our{" "}
+        <button
+          type="button"
+          onClick={() => { setTermsTab('terms'); setIsTermsOpen(true); }}
+          style={{ background: "none", border: "none", color: "#059669", fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "0.78rem" }}
+        >
+          Terms & Conditions
+        </button>{" "}
+        and{" "}
+        <button
+          type="button"
+          onClick={() => { setTermsTab('privacy'); setIsTermsOpen(true); }}
+          style={{ background: "none", border: "none", color: "#059669", fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "0.78rem" }}
+        >
+          Privacy Policy
+        </button>.
+      </div>
+
       {/* Register Link */}
-      <div style={{ marginTop: "1.75rem", textAlign: "center", fontSize: "0.95rem", color: "#6B7280" }}>
+      <div style={{ marginTop: "1.25rem", textAlign: "center", fontSize: "0.95rem", color: "#6B7280" }}>
         Don't have an account?{" "}
         <button
           type="button"
@@ -411,6 +367,13 @@ export const LoginPage: React.FC = () => {
           Create account
         </button>
       </div>
+
+      {/* Legal & Governance Terms Modal */}
+      <TermsModal
+        isOpen={isTermsOpen}
+        onClose={() => setIsTermsOpen(false)}
+        defaultTab={termsTab}
+      />
     </AuthLayout>
   );
 };

@@ -131,15 +131,6 @@ export const InvestmentsPage: React.FC = () => {
               <Plus size={15} /> Add Investment Asset
             </button>
           )}
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => openViewSettingsModal('investments')}
-            title="Investments View Settings"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Settings size={14} />
-            <span>Settings</span>
-          </button>
         </div>
       </div>
 

@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useRouter } from '../../router/Router';
 import { useAuth } from '../../context/AuthContext';
 import { useFamilyFinance } from '../../context/FamilyFinanceContext';
-import { createFamilyWithOwner, joinFamilyByCode } from '../../services/familyService';
-import { Users, PlusCircle, UserPlus, ArrowRight, ShieldCheck, AlertCircle, Sparkles, Check, Key, Play, ArrowLeft } from 'lucide-react';
+import { createFamilyWithOwner, joinFamilyByCode, generateFamilyCode } from '../../services/familyService';
+import { Users, PlusCircle, UserPlus, ArrowRight, ShieldCheck, AlertCircle, Sparkles, Check, Copy, Key, Play, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const FamilySetupPage: React.FC = () => {
   const { navigate } = useRouter();
@@ -15,6 +15,9 @@ export const FamilySetupPage: React.FC = () => {
   // Form State: Create
   const [familyName, setFamilyName] = useState('');
   const [familyDesc, setFamilyDesc] = useState('');
+  const [familyCode, setFamilyCode] = useState(() => generateFamilyCode());
+  const [createdFamilyInfo, setCreatedFamilyInfo] = useState<{ name: string; code: string } | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   // Form State: Join
   const [inviteCode, setInviteCode] = useState('');
@@ -30,13 +33,16 @@ export const FamilySetupPage: React.FC = () => {
       return;
     }
 
+    const cleanCode = familyCode.trim().toUpperCase() || generateFamilyCode();
+
     setIsSubmitting(true);
     try {
-      const res = await createFamilyWithOwner(familyName, familyDesc);
+      const res = await createFamilyWithOwner(familyName, familyDesc, cleanCode);
       if (res.success && res.family_id) {
-        createLocalFamily(familyName.trim(), 'INR', 'Asia/Kolkata');
+        const finalCode = res.invite_code || cleanCode;
+        createLocalFamily(familyName.trim(), familyDesc.trim() || undefined, 'INR', 'India', finalCode);
         await refreshMemberships();
-        navigate('/dashboard');
+        setCreatedFamilyInfo({ name: familyName.trim(), code: finalCode });
       } else {
         setErrorMessage(res.error || 'Could not create family. Please try again.');
       }
@@ -73,6 +79,82 @@ export const FamilySetupPage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (createdFamilyInfo) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+        <div style={{ maxWidth: '520px', width: '100%', background: '#FFFFFF', borderRadius: '20px', padding: '2.5rem', border: '1px solid #E2E8F0', boxShadow: '0 10px 30px -5px rgba(0,0,0,0.05)', textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#DCFCE7', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+            <Sparkles size={32} />
+          </div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
+            Family Created Successfully 🎉
+          </h2>
+          <p style={{ fontSize: '0.92rem', color: '#475569', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+            Your family workspace <strong>{createdFamilyInfo.name}</strong> is live.
+          </p>
+
+          <div style={{ padding: '1.25rem', borderRadius: '14px', background: '#F8FAFC', border: '1px dashed #CBD5E1', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+              Your Unique Family Code
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '2px', color: '#059669', marginBottom: '0.5rem' }}>
+              {createdFamilyInfo.code}
+            </div>
+            <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 0 0.85rem' }}>
+              Share this code with your family members so they can link and join this family from their devices.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(createdFamilyInfo.code);
+                setCopiedCode(true);
+                setTimeout(() => setCopiedCode(false), 2000);
+              }}
+              style={{
+                padding: '0.45rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                background: '#FFFFFF',
+                color: '#334155',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              {copiedCode ? <Check size={15} color="#059669" /> : <Copy size={15} />}
+              <span>{copiedCode ? 'Copied Code!' : 'Copy Family Code'}</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            style={{
+              width: '100%',
+              padding: '0.875rem',
+              background: '#059669',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 700,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            Go to Family Dashboard <ArrowRight size={18} />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
@@ -378,6 +460,24 @@ export const FamilySetupPage: React.FC = () => {
                   onChange={e => setFamilyDesc(e.target.value)}
                   style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }}
                 />
+              </div>
+
+              <div
+                style={{
+                  padding: '0.85rem 1rem',
+                  borderRadius: '10px',
+                  background: '#F0FDF4',
+                  border: '1px solid #BBF7D0',
+                  marginBottom: '1.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                }}
+              >
+                <Key size={18} color="#059669" style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: '0.82rem', color: '#166534' }}>
+                  <strong>Automatic Unique Family Code:</strong> A secure code (e.g. <code>{familyCode}</code>) will be created for your family to let members link from other devices.
+                </div>
               </div>
 
               <button

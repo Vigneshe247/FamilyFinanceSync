@@ -158,7 +158,7 @@ export async function getUserMemberships(userId: string): Promise<UserFamilyMemb
 /**
  * Create a new Family workspace (Creator becomes FAMILY HEAD)
  */
-export async function createFamilyWithOwner(name: string, description?: string): Promise<CreateFamilyResult> {
+export async function createFamilyWithOwner(name: string, description?: string, customFamilyCode?: string): Promise<CreateFamilyResult> {
   const cleanName = name.trim();
   if (!cleanName) {
     return { success: false, error: 'Family name is required.' };
@@ -166,7 +166,7 @@ export async function createFamilyWithOwner(name: string, description?: string):
 
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id || 'usr-local-demo';
-  const familyCode = generateFamilyCode();
+  const familyCode = customFamilyCode?.trim().toUpperCase() || generateFamilyCode();
 
   // 1. Try atomic Supabase RPC create_family
   try {

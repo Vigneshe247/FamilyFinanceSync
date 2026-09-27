@@ -13,7 +13,7 @@ import { useRouter } from '../../router/Router';
 import { CreateFamilyModal } from '../modals/CreateFamilyModal';
 import { JoinFamilyModal } from '../modals/JoinFamilyModal';
 import { MyFamiliesModal } from '../modals/MyFamiliesModal';
-import { Plus, Key, FolderKanban } from 'lucide-react';
+import { Plus, Key, FolderKanban, Link2, Copy } from 'lucide-react';
 
 import { ROLE_DISPLAY_NAMES, normalizeRole } from '../../utils/permissions';
 import {
@@ -84,6 +84,7 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
   const { navigate } = useRouter();
 
     const [familyDropdownOpen, setFamilyDropdownOpen] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [demoUserDropdownOpen, setDemoUserDropdownOpen] = useState(false);
   const [createFamilyModalOpen, setCreateFamilyModalOpen] = useState(false);
   const [joinFamilyModalOpen, setJoinFamilyModalOpen] = useState(false);
@@ -209,7 +210,7 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                 marginBottom: '0.45rem',
               }}
             >
-              Linked Families ({linkedFamilies.length})
+              MY FAMILIES ({linkedFamilies.length})
             </div>
 
             <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
@@ -247,6 +248,56 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                 );
               })}
             </div>
+
+            {family && (family.invite_code || family.family_code || activeFamily?.invite_code || activeFamily?.family_code) && (
+              <div
+                style={{
+                  padding: '0.45rem 0.65rem',
+                  margin: '0.35rem 0 0.5rem',
+                  borderRadius: '10px',
+                  background: 'var(--bg-canvas-subtle)',
+                  border: '1px dashed var(--border-subtle)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '0.75rem',
+                }}
+              >
+                <div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 700 }}>
+                    Family Code:{' '}
+                  </span>
+                  <strong style={{ fontFamily: 'monospace', letterSpacing: '1px', color: 'var(--mint-primary)' }}>
+                    {family.invite_code || family.family_code || activeFamily?.invite_code || activeFamily?.family_code}
+                  </strong>
+                </div>
+                <button
+                  type="button"
+                  onClick={e => {
+                    e.stopPropagation();
+                    const code = family.invite_code || family.family_code || activeFamily?.invite_code || activeFamily?.family_code || '';
+                    navigator.clipboard.writeText(code);
+                    setCopiedCode(true);
+                    setTimeout(() => setCopiedCode(false), 2000);
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '0.2rem 0.4rem',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                  }}
+                >
+                  {copiedCode ? <Check size={12} color="#059669" /> : <Copy size={12} />}
+                  <span>{copiedCode ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+            )}
 
             <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '0.45rem 0', paddingTop: '0.45rem' }}>
               <button
@@ -296,7 +347,7 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                   textAlign: 'left',
                 }}
               >
-                <Key size={15} /> Join Family with Code
+                <Link2 size={15} /> Join Family
               </button>
 
               <button
@@ -321,7 +372,7 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                   textAlign: 'left',
                 }}
               >
-                <FolderKanban size={15} /> Manage My Families
+                <FolderKanban size={15} /> Manage Families
               </button>
             </div>
           </div>

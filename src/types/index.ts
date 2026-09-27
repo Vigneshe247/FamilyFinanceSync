@@ -136,6 +136,8 @@ export interface Family {
   owner_id: string;
   currency: string; // Default: 'INR'
   timezone: string;
+  invite_code?: string;
+  family_code?: string;
   description?: string;
   country?: string;
   created_at: string;
@@ -150,6 +152,8 @@ export interface FamilyMembership {
   role: FamilyMembershipRole;
   status: 'active' | 'pending' | 'invited' | 'removed';
   member_count: number;
+  invite_code?: string;
+  family_code?: string;
   description?: string;
   currency?: string;
   joined_at?: string;

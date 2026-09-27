@@ -55,6 +55,7 @@ import {
   SYSTEM_PERMISSIONS,
 } from '../data/seedData';
 import { normalizeRole } from '../utils/permissions';
+import { generateFamilyCode } from '../services/familyService';
 
 interface FamilyFinanceContextType {
   // Privacy & Linked Family Architecture (Section 1-37)
@@ -65,7 +66,7 @@ interface FamilyFinanceContextType {
   demoUsers: DemoUserOption[];
   switchDemoUser: (userId: string) => void;
   switchActiveFamily: (familyId: string) => void;
-  createFamily: (name: string, description?: string, currency?: string, country?: string) => Family;
+  createFamily: (name: string, description?: string, currency?: string, country?: string, customCode?: string) => Family;
   joinFamily: (inviteCode: string) => { success: boolean; message: string; family?: Family };
   updateTransactionVisibility: (txId: string, newVisibility: 'private' | 'family', targetFamilyId?: string) => void;
   authorizedTransactions: Transaction[];
@@ -258,6 +259,7 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
 
         const primaryMem = memberships[0];
         if (primaryMem && primaryMem.family_id) {
+          const famCode = primaryMem.invite_code || generateFamilyCode();
           const syncedFam: Family = {
             id: primaryMem.family_id,
             name: primaryMem.family_name,
@@ -265,6 +267,8 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
             currency: 'INR',
             country: 'India',
             owner_id: user.id,
+            invite_code: famCode,
+            family_code: famCode,
             timezone: 'Asia/Kolkata',
             created_at: primaryMem.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -2064,8 +2068,9 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
   }, [allFamilies, members, activeUserId]);
 
   // Create Family (Section 12)
-  const createFamily = useCallback((name: string, description?: string, currency = 'INR', country = 'India'): Family => {
+  const createFamily = useCallback((name: string, description?: string, currency = 'INR', country = 'India', customCode?: string): Family => {
     const newFamId = `fam-${Date.now()}`;
+    const code = customCode ? customCode.trim().toUpperCase() : generateFamilyCode();
     const newFam: Family = {
       id: newFamId,
       name,
@@ -2073,6 +2078,8 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
       currency,
       country,
       owner_id: activeUserId,
+      invite_code: code,
+      family_code: code,
       timezone: 'Asia/Kolkata',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

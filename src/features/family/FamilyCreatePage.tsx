@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useRouter } from '../../router/Router';
 import { useAuth } from '../../context/AuthContext';
 import { useFamilyFinance } from '../../context/FamilyFinanceContext';
-import { createFamilyWithOwner } from '../../services/familyService';
-import { PlusCircle, ShieldCheck, AlertCircle, ArrowLeft, Users } from 'lucide-react';
+import { createFamilyWithOwner, generateFamilyCode } from '../../services/familyService';
+import { PlusCircle, ShieldCheck, AlertCircle, ArrowLeft, Users, Key, RefreshCw, Sparkles, Copy, Check } from 'lucide-react';
 
 export const FamilyCreatePage: React.FC = () => {
   const { navigate } = useRouter();
@@ -12,8 +12,11 @@ export const FamilyCreatePage: React.FC = () => {
 
   const [familyName, setFamilyName] = useState('');
   const [familyDesc, setFamilyDesc] = useState('');
+  const [familyCode, setFamilyCode] = useState(() => generateFamilyCode());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [createdResult, setCreatedResult] = useState<{ name: string; code: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,9 +31,10 @@ export const FamilyCreatePage: React.FC = () => {
     try {
       const res = await createFamilyWithOwner(cleanName, familyDesc);
       if (res.success && res.family_id) {
-        createLocalFamily(cleanName, 'INR', 'Asia/Kolkata');
+        const code = res.invite_code || generateFamilyCode();
+        createLocalFamily(cleanName, 'INR', 'Asia/Kolkata', 'India', code);
         await refreshMemberships();
-        navigate('/dashboard');
+        setCreatedResult({ name: cleanName, code });
       } else {
         setErrorMessage(res.error || 'Could not create family. Please try again.');
       }
@@ -41,6 +45,71 @@ export const FamilyCreatePage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const handleCopyCode = () => {
+    if (!createdResult) return;
+    navigator.clipboard.writeText(createdResult.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (createdResult) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+        <div style={{ maxWidth: '520px', width: '100%', background: '#FFFFFF', borderRadius: '20px', padding: '2.5rem', border: '1px solid #E2E8F0', boxShadow: '0 10px 30px -5px rgba(0,0,0,0.05)', textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#DCFCE7', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+            <Sparkles size={32} />
+          </div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
+            Family Created Successfully 🎉
+          </h2>
+          <p style={{ fontSize: '0.92rem', color: '#475569', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+            Your family workspace <strong>{createdResult.name}</strong> is live.
+          </p>
+
+          <div style={{ padding: '1.25rem', borderRadius: '14px', background: '#F8FAFC', border: '1px dashed #CBD5E1', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+              Your Unique Family Code
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '2px', color: '#059669', marginBottom: '0.5rem' }}>
+              {createdResult.code}
+            </div>
+            <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 0 0.85rem' }}>
+              Share this code with family members to let them join.
+            </p>
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              style={{
+                padding: '0.4rem 0.85rem',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                background: '#FFFFFF',
+                color: '#334155',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+            >
+              {copied ? <Check size={15} color="#059669" /> : <Copy size={15} />}
+              <span>{copied ? 'Copied Code!' : 'Copy Code'}</span>
+            </button>
+          </div>
+
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate('/dashboard')}
+            style={{ width: '100%', padding: '0.9rem', borderRadius: '12px', fontWeight: 700, fontSize: '1rem', background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)', border: 'none', color: '#FFF' }}
+          >
+            Go to Family Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
@@ -162,3 +231,4 @@ export const FamilyCreatePage: React.FC = () => {
     </div>
   );
 };
+

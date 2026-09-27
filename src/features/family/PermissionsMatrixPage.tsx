@@ -29,9 +29,11 @@ import { useViewSettings } from '../../context/ViewSettingsContext';
 export const PermissionsMatrixPage: React.FC = () => {
   const {
     members,
+    activeFamilyMembers,
     roles,
     currentMember,
     family,
+    activeFamily,
     isDemoMode,
     toggleMemberPermission,
     grantAllMemberPermissions,
@@ -40,6 +42,19 @@ export const PermissionsMatrixPage: React.FC = () => {
     savePermissionsToBackend,
   } = useFamilyFinance();
   const { openViewSettingsModal } = useViewSettings();
+
+  // Scoped linked family members for the active family workspace
+  const currentFamilyMembers = React.useMemo(() => {
+    if (activeFamilyMembers && activeFamilyMembers.length > 0) {
+      return activeFamilyMembers;
+    }
+    const targetFamId = family?.id || activeFamily?.id;
+    return members.filter(m => {
+      if (m.family_id === targetFamId) return true;
+      if (!targetFamId && isDemoMode) return true;
+      return false;
+    });
+  }, [activeFamilyMembers, members, family?.id, activeFamily?.id, isDemoMode]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
@@ -153,11 +168,11 @@ export const PermissionsMatrixPage: React.FC = () => {
             <KeyRound size={22} color="var(--brass)" />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.85rem', fontWeight: 700, color: 'var(--ink)' }}>
+            <h1 style={{ fontSize: '1.85rem', fontWeight: 700, color: 'var(--ink)', margin: 0 }}>
               Permissions Matrix &amp; Member Overrides
             </h1>
-            <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem' }}>
-              Granular access control capability matrix.
+            <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', margin: '0.2rem 0 0.4rem 0' }}>
+              Granular access control capability matrix for workspace <strong>{family?.name || activeFamily?.name || 'Family Workspace'}</strong> ({currentFamilyMembers.length} Linked Members).
               {isHead
                 ? ' As Family Head, you can toggle individual permissions and grant/revoke access per member.'
                 : ' Your current access level is shown below based on your role and any custom overrides.'}
@@ -201,7 +216,7 @@ export const PermissionsMatrixPage: React.FC = () => {
             marginBottom: '1.5rem',
           }}
         >
-          {members
+          {currentFamilyMembers
             .filter(m => normalizeRole(m.role) !== 'family_head' && m.role !== 'FAMILY_HEAD')
             .map(member => {
               const overrideCount = countOverrides(member);
@@ -283,7 +298,7 @@ export const PermissionsMatrixPage: React.FC = () => {
 
       {/* Confirmation Dialog */}
       {confirmAction && (() => {
-        const member = members.find(m => m.id === confirmAction.memberId);
+        const member = currentFamilyMembers.find(m => m.id === confirmAction.memberId);
         if (!member) return null;
         const actionLabel = confirmAction.action === 'grant' ? 'grant ALL permissions to' : confirmAction.action === 'revoke' ? 'REVOKE ALL permissions from' : 'reset permissions to defaults for';
         const actionColor = confirmAction.action === 'grant' ? 'var(--mint-primary)' : confirmAction.action === 'revoke' ? 'var(--rust)' : 'var(--brass)';
@@ -392,7 +407,7 @@ export const PermissionsMatrixPage: React.FC = () => {
               <tr>
                 <th style={{ minWidth: '200px' }}>Permission Key</th>
                 <th style={{ minWidth: '180px' }}>Description</th>
-                {members.map(m => {
+                {currentFamilyMembers.map(m => {
                   const isHeadMember = normalizeRole(m.role) === 'family_head' || m.role === 'FAMILY_HEAD';
                   const overrideCount = countOverrides(m);
                   return (
@@ -437,7 +452,7 @@ export const PermissionsMatrixPage: React.FC = () => {
                     {/* Group Header Row */}
                     <tr style={{ background: 'var(--paper-dim)' }}>
                       <td
-                        colSpan={2 + members.length}
+                        colSpan={2 + currentFamilyMembers.length}
                         style={{
                           fontWeight: 700,
                           fontSize: '0.72rem',
@@ -460,7 +475,7 @@ export const PermissionsMatrixPage: React.FC = () => {
                           {perm.description}
                         </td>
 
-                        {members.map(m => {
+                        {currentFamilyMembers.map(m => {
                           const isHeadMember = normalizeRole(m.role) === 'family_head' || m.role === 'FAMILY_HEAD';
                           const roleDef = roles.find(r =>
                             r.name.toLowerCase() === m.role.toLowerCase() ||

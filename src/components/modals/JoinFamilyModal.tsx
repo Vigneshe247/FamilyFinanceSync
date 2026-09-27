@@ -79,7 +79,7 @@ export const JoinFamilyModal: React.FC<JoinFamilyModalProps> = ({ isOpen, onClos
                 Join Family
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0 0' }}>
-                Enter your invitation code to connect
+                Enter the family code shared by the family owner.
               </p>
             </div>
           </div>
@@ -131,20 +131,20 @@ export const JoinFamilyModal: React.FC<JoinFamilyModalProps> = ({ isOpen, onClos
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <label className="label" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-              Family Code or Invitation Code
+              Family Code
             </label>
             <input
               type="text"
               className="input"
               value={inviteCode}
               onChange={e => setInviteCode(e.target.value.toUpperCase())}
-              placeholder="e.g. VIG-FAM-48291"
+              placeholder="e.g. FAM-7KQ9-M2XP"
               style={{ letterSpacing: '0.08em', fontWeight: 700, textTransform: 'uppercase' }}
               required
               autoFocus
             />
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              Ask your Family Head or Admin for their family invitation code.
+              Don't have a code? Ask the family owner to share their family invitation code.
             </div>
           </div>
 

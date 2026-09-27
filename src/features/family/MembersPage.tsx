@@ -30,11 +30,19 @@ import {
   Home,
   Edit3,
   Check,
+  Copy,
+  Key,
 } from 'lucide-react';
 import { InvitationModal } from '../../components/modals/InvitationModal';
 import { CreateRoleModal } from '../../components/modals/CreateRoleModal';
 import { AccessRestricted } from '../../components/auth/AccessRestricted';
 import { useViewSettings } from '../../context/ViewSettingsContext';
+import {
+  getPendingFamilyJoinRequests,
+  approveFamilyJoinRequest,
+  rejectFamilyJoinRequest,
+  FamilyJoinRequestRecord,
+} from '../../services/familyService';
 
 interface MembersPageProps {
   onNavigatePermissions?: () => void;
@@ -56,6 +64,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
     removeMember,
     invitations,
     revokeInvitation,
+    isDemoMode,
   } = useFamilyFinance();
 
   const { can, isFamilyHead } = usePermissions();
@@ -100,6 +109,55 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
 
   // View Member Profile Modal State
   const [memberToView, setMemberToView] = useState<FamilyMember | null>(null);
+
+  // Pending Family Join Requests (from devices/members using the family code)
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<FamilyJoinRequestRecord[]>([]);
+  const [joinRequestFeedback, setJoinRequestFeedback] = useState<string>('');
+  const [copiedFamilyCode, setCopiedFamilyCode] = useState(false);
+
+  const loadJoinRequests = async () => {
+    if (family?.id) {
+      const list = await getPendingFamilyJoinRequests(family.id);
+      setPendingJoinRequests(list);
+    }
+  };
+
+  useEffect(() => {
+    if (isHead && family?.id) {
+      loadJoinRequests();
+    }
+  }, [family?.id, isHead]);
+
+  const handleApproveJoin = async (requestId: string) => {
+    const res = await approveFamilyJoinRequest(requestId);
+    if (res.success) {
+      setJoinRequestFeedback('Member join request approved! They are now linked to this family workspace.');
+      await loadJoinRequests();
+      setTimeout(() => setJoinRequestFeedback(''), 4000);
+    }
+  };
+
+  const handleRejectJoin = async (requestId: string) => {
+    const res = await rejectFamilyJoinRequest(requestId);
+    if (res.success) {
+      setJoinRequestFeedback('Member join request declined.');
+      await loadJoinRequests();
+      setTimeout(() => setJoinRequestFeedback(''), 4000);
+    }
+  };
+
+  // Filter all members linked to the active family workspace
+  const currentFamilyMembers = useMemo(() => {
+    if (activeFamilyMembers && activeFamilyMembers.length > 0) {
+      return activeFamilyMembers;
+    }
+    const targetFamId = family?.id || activeFamily?.id;
+    return members.filter(m => {
+      if (m.family_id === targetFamId) return true;
+      if (!targetFamId && isDemoMode) return true;
+      return false;
+    });
+  }, [activeFamilyMembers, members, family?.id, activeFamily?.id, isDemoMode]);
 
   if (!can('viewMembers')) {
     return <AccessRestricted message="You don't have permission to view family members." />;
@@ -239,7 +297,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
                   fontWeight: 600,
                 }}
               >
-                {activeFamilyMembers.length} Members
+                {currentFamilyMembers.length} Linked Members
               </span>
               {nameSaveFeedback && (
                 <span
@@ -363,8 +421,46 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
           </div>
         </div>
 
-        {/* Right side info pill */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        {/* Right side info pill & Family Code */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          {(family?.family_code || family?.invite_code || activeFamily?.family_code || activeFamily?.invite_code) && (
+            <div
+              style={{
+                padding: '0.45rem 0.85rem',
+                borderRadius: '12px',
+                background: 'rgba(5, 150, 105, 0.08)',
+                border: '1px solid rgba(5, 150, 105, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Family Code
+                </div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, fontFamily: 'monospace', color: '#059669', letterSpacing: '0.5px' }}>
+                  {family?.family_code || family?.invite_code || activeFamily?.family_code || activeFamily?.invite_code}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const code = family?.family_code || family?.invite_code || activeFamily?.family_code || activeFamily?.invite_code || '';
+                  navigator.clipboard.writeText(code);
+                  setCopiedFamilyCode(true);
+                  setTimeout(() => setCopiedFamilyCode(false), 2000);
+                }}
+                className="btn btn-sm btn-secondary"
+                style={{ padding: '0.2rem 0.45rem', fontSize: '0.72rem', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                title="Copy Family Code"
+              >
+                {copiedFamilyCode ? <Check size={12} color="#059669" /> : <Copy size={12} />}
+                <span>{copiedFamilyCode ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+          )}
+
           <div
             style={{
               padding: '0.45rem 0.85rem',
@@ -442,9 +538,108 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
         </div>
       )}
 
+      {/* Action feedback for join request approval */}
+      {joinRequestFeedback && (
+        <div
+          style={{
+            marginBottom: '1.25rem',
+            padding: '0.75rem 1rem',
+            borderRadius: '12px',
+            background: 'rgba(5, 150, 105, 0.1)',
+            border: '1px solid rgba(5, 150, 105, 0.25)',
+            color: '#059669',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <CheckCircle2 size={16} />
+          <span>{joinRequestFeedback}</span>
+        </div>
+      )}
+
+      {/* Pending Family Code Join Requests from other devices/members */}
+      {isHead && pendingJoinRequests.length > 0 && (
+        <div
+          className="neo-card"
+          style={{
+            marginBottom: '1.5rem',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            background: 'rgba(16, 185, 129, 0.05)',
+            padding: '1.25rem',
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 800,
+              fontSize: '1rem',
+              color: 'var(--mint-primary)',
+              marginBottom: '0.45rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <UserPlus size={19} /> Pending Member Join Requests ({pendingJoinRequests.length})
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.85rem' }}>
+            These family members entered your unique Family Code on another device and are requesting to link into this workspace. As Family Head, you can approve or decline their access:
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            {pendingJoinRequests.map(req => (
+              <div
+                key={req.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-card)',
+                  padding: '0.85rem 1rem',
+                  borderRadius: '12px',
+                  gap: '1rem',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                    {req.applicant_name || 'New Family Member'}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                    <Mail size={12} style={{ display: 'inline', marginRight: '0.3rem' }} />
+                    {req.applicant_email || 'Linked Device / Code Request'}
+                    <span style={{ margin: '0 0.4rem' }}>•</span>
+                    Requested {new Date(req.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => handleApproveJoin(req.id)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: 700 }}
+                  >
+                    <CheckCircle2 size={14} /> Approve &amp; Link Member
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => handleRejectJoin(req.id)}
+                    style={{ color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.78rem' }}
+                  >
+                    <XCircle size={14} /> Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Members Grid (Section 16) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
-        {members.map(m => {
+        {currentFamilyMembers.map(m => {
           const isMe = m.id === currentMember.id;
           const isThisHead = normalizeRole(m.role) === 'family_head';
           const isEditingLimit = editingLimitMemberId === m.id;

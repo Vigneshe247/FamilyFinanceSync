@@ -20,16 +20,13 @@ export const FamilyJoinPage: React.FC = () => {
     if (clean.startsWith('FAM')) {
       clean = clean.substring(3);
     }
-    let formatted = 'FAM';
-    if (clean.length > 0) formatted += '-' + clean.substring(0, 4);
-    if (clean.length > 4) formatted += '-' + clean.substring(4, 8);
-    return formatted;
+    return clean.length > 0 ? `FAM-${clean}` : 'FAM-';
   };
 
   const handleChangeCode = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    if (raw.length < inviteCode.length && raw.endsWith('-')) {
-      setInviteCode(raw.substring(0, raw.length - 1));
+    if (raw.length === 0) {
+      setInviteCode('');
       return;
     }
     const formatted = formatCodeInput(raw);
@@ -40,8 +37,8 @@ export const FamilyJoinPage: React.FC = () => {
     e.preventDefault();
     setErrorMessage('');
     const cleanCode = inviteCode.trim();
-    if (!cleanCode || cleanCode.length < 8) {
-      setErrorMessage('Please enter a valid family invitation code (e.g. FAM-ABCD-1234).');
+    if (!cleanCode || cleanCode.replace(/[^A-Z0-9]/g, '').length < 6) {
+      setErrorMessage('Please enter a valid family invitation code (e.g. FAM-7K4P9X).');
       return;
     }
 

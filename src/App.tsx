@@ -6,7 +6,6 @@ import { usePermissions } from './context/FamilyContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AccessRestricted } from './components/auth/AccessRestricted';
 import { TopMenubar } from './components/layout/TopMenubar';
-
 // Auth Pages & Family Setup
 import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
@@ -52,6 +51,7 @@ import {
   GitPullRequest,
   Users,
   Wallet,
+  Loader2,
 } from 'lucide-react';
 
 const pathToTabMap: Record<string, string> = {
@@ -141,6 +141,46 @@ const AppInner: React.FC = () => {
     setNewTxModalOpen(true);
   };
 
+  // Explicit loading state to prevent flash of login/setup while Supabase session restores (Section 4)
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1.25rem',
+          background: 'var(--bg-canvas, #F8FAFC)',
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '16px',
+            background: '#059669',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFFFFF',
+            boxShadow: '0 10px 25px -5px rgba(5, 150, 105, 0.4)',
+          }}
+        >
+          <Wallet size={30} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <Loader2 className="animate-spin" size={22} color="#059669" />
+          <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--ink, #0F172A)' }}>
+            Checking authentication &amp; loading your family...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   // ================= 1. PUBLIC & SETUP ROUTES =================
   if (currentPath === '/login') {
     if (isAuthenticated && isEmailVerified) {
@@ -178,6 +218,11 @@ const AppInner: React.FC = () => {
   }
 
   if (currentPath === '/family/setup') {
+    // Returning users with existing active family must never be trapped in setup (Section 3)
+    if (isAuthenticated && isEmailVerified && familyCount > 0) {
+      navigate('/dashboard');
+      return null;
+    }
     return <FamilySetupPage />;
   }
 
@@ -197,7 +242,7 @@ const AppInner: React.FC = () => {
     return <FamilySelectPage />;
   }
 
-  // Force authenticated users with 0 families to complete setup
+  // Force authenticated users with 0 families to complete setup (one-time onboarding)
   if (isAuthenticated && isEmailVerified && familyCount === 0 && currentPath !== '/demo') {
     return <FamilySetupPage />;
   }
@@ -387,10 +432,12 @@ const AppInner: React.FC = () => {
           onClose={() => setProfileModalOpen(false)}
         />
 
-        <DataImportModal
-          isOpen={importModalOpen}
-          onClose={() => setImportModalOpen(false)}
-        />
+        {importModalOpen && (
+          <DataImportModal
+            isOpen={importModalOpen}
+            onClose={() => setImportModalOpen(false)}
+          />
+        )}
 
         {/* Dynamic Context-Aware View Settings Modal */}
         <ViewSettingsModal
@@ -398,6 +445,7 @@ const AppInner: React.FC = () => {
           onClose={closeViewSettingsModal}
           onNavigateControlCenter={() => setActiveTab('control_center')}
         />
+
       </div>
     </ProtectedRoute>
   );

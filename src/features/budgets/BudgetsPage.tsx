@@ -78,6 +78,14 @@ export const BudgetsPage: React.FC = () => {
     setEditingCategoryId(null);
   };
 
+  const handleInitializeDefaultEnvelopes = () => {
+    const expenseCats = categories.filter(c => c.type === 'expense');
+    expenseCats.slice(0, 6).forEach((cat, idx) => {
+      const defaultPaise = idx === 0 ? 1500000 : idx === 1 ? 500000 : idx === 2 ? 600000 : 500000;
+      updateBudgetCategory(cat.id, defaultPaise);
+    });
+  };
+
   return (
     <div className="content-page">
       {/* Header */}
@@ -188,8 +196,24 @@ export const BudgetsPage: React.FC = () => {
 
       {/* Categories Budget Cards Grid */}
       <div className="grid-2col">
-        {budgetStats.map(item => {
-          const isEditing = editingCategoryId === item.category_id;
+        {budgetStats.length === 0 ? (
+          <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+            <PiggyBank size={40} style={{ color: 'var(--brass)', margin: '0 auto 1rem', display: 'block', opacity: 0.8 }} />
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--ink)', marginBottom: '0.5rem' }}>
+              No Category Budgets Configured
+            </h3>
+            <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 1.5rem' }}>
+              Set up monthly spending envelopes for your family categories (Food, Utilities, Transport, etc.) to monitor threshold alerts.
+            </p>
+            {canEdit && (
+              <button className="btn btn-primary" onClick={handleInitializeDefaultEnvelopes}>
+                <Plus size={15} /> Initialize Default Category Envelopes
+              </button>
+            )}
+          </div>
+        ) : (
+          budgetStats.map(item => {
+            const isEditing = editingCategoryId === item.category_id;
           const barColor =
             item.statusType === 'exceeded'
               ? '#832C26'
@@ -308,7 +332,7 @@ export const BudgetsPage: React.FC = () => {
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

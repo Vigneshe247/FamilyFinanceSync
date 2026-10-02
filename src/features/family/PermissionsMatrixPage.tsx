@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { useFamilyFinance } from '../../context/FamilyFinanceContext';
-import { SYSTEM_PERMISSIONS } from '../../data/seedData';
+import { SYSTEM_PERMISSIONS } from '../../constants/systemData';
 import { PermissionKey } from '../../types';
 import { normalizeRole, ROLE_DISPLAY_NAMES } from '../../utils/permissions';
 import {

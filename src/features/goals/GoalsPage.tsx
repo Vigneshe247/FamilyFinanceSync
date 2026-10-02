@@ -202,8 +202,24 @@ export const GoalsPage: React.FC = () => {
 
       {/* Goals Grid */}
       <div className="grid-3col">
-        {displayedGoals.map(goal => {
-          const pct = Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100));
+        {displayedGoals.length === 0 ? (
+          <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+            <Target size={40} style={{ color: 'var(--brass)', margin: '0 auto 1rem', display: 'block', opacity: 0.8 }} />
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--ink)', marginBottom: '0.5rem' }}>
+              No Savings Goals Configured
+            </h3>
+            <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 1.5rem' }}>
+              Define family or personal savings milestones (e.g., Emergency Fund, Children's Education, Vacation) to track collective progress.
+            </p>
+            {canCreate && (
+              <button className="btn btn-primary" onClick={() => setNewGoalModalOpen(true)}>
+                <Plus size={15} /> Create First Savings Goal
+              </button>
+            )}
+          </div>
+        ) : (
+          displayedGoals.map(goal => {
+            const pct = Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100));
           const remainingPaise = Math.max(0, goal.target_amount - goal.current_amount);
           const isCompleted = goal.current_amount >= goal.target_amount;
 
@@ -299,7 +315,7 @@ export const GoalsPage: React.FC = () => {
               )}
             </div>
           );
-        })}
+        }))}
       </div>
 
       {/* Contribute Modal */}

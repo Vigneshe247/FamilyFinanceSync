@@ -33,7 +33,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
   const [email, setEmail] = useState('');
   const [allowanceInput, setAllowanceInput] = useState('2000');
   const [isSending, setIsSending] = useState(false);
-  const [emailSentNotice, setEmailSentNotice] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<{ attempted: boolean; sent: boolean; notice?: string }>({ attempted: false, sent: false });
   const [generatedInvite, setGeneratedInvite] = useState<{
     code: string;
     link: string;
@@ -46,7 +46,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSending(true);
-    setEmailSentNotice(false);
+    setEmailStatus({ attempted: false, sent: false });
 
     try {
       const inv = createInvitation(role, email || undefined);
@@ -64,7 +64,11 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
         if (tokenRes.success && tokenRes.inviteToken) {
           inviteLink = `${window.location.origin}/family/invite/${tokenRes.inviteToken}`;
           if (tokenRes.familyCode) inviteCode = tokenRes.familyCode;
-          setEmailSentNotice(true);
+          setEmailStatus({
+            attempted: true,
+            sent: !!tokenRes.emailSent,
+            notice: tokenRes.emailNotice,
+          });
         }
       }
 
@@ -198,10 +202,22 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
             </form>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {emailSentNotice && (
+              {emailStatus.attempted && emailStatus.sent && (
                 <div style={{ padding: '0.75rem 1rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', color: '#166534', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Mail size={16} style={{ color: '#16A34A', flexShrink: 0 }} />
                   <span>Invitation email has been sent successfully to <strong>{email}</strong>!</span>
+                </div>
+              )}
+
+              {emailStatus.attempted && !emailStatus.sent && (
+                <div style={{ padding: '0.75rem 1rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', color: '#92400E', fontSize: '0.80rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <Mail size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontWeight: 600 }}>Invitation link & code ready!</div>
+                    <div style={{ marginTop: '2px', color: '#78350F', fontSize: '0.76rem', lineHeight: 1.4 }}>
+                      To dispatch automated emails directly to inboxes, add <code>VITE_RESEND_API_KEY</code> in <code>.env</code> or configure Supabase Custom SMTP. You can copy and share the link below directly with your family member.
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -258,7 +274,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                   className="btn btn-secondary"
                   onClick={() => {
                     setGeneratedInvite(null);
-                    setEmailSentNotice(false);
+                    setEmailStatus({ attempted: false, sent: false });
                   }}
                   style={{ flex: 1 }}
                 >

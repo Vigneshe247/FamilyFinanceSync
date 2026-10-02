@@ -207,10 +207,39 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissions> = {
     sendRequest: false,
     receiveNotifications: true,
   },
+  member: {
+    addExpense: true,
+    addIncome: true,
+    viewOwnTransactions: true,
+    editOwnTransaction: true,
+    editAnyTransaction: false,
+    deleteOwnTransaction: false,
+    deleteAnyTransaction: false,
+    viewDashboard: true,
+    viewFamilyIncome: true,
+    viewFamilyExpenses: true,
+    viewOtherMembers: true,
+    viewFamilySummary: true,
+    viewAccounts: true,
+    manageAccounts: false,
+    viewBudget: true,
+    manageBudget: false,
+    viewReports: true,
+    exportReports: false,
+    viewMembers: true,
+    inviteMembers: false,
+    removeMembers: false,
+    manageRoles: false,
+    managePermissions: false,
+    manageFamilySettings: false,
+    sendRequest: true,
+    receiveNotifications: true,
+  },
 };
 
 export const ROLE_DISPLAY_NAMES: Record<string, string> = {
   family_head: 'Family Head',
+  member: 'Family Member',
   spouse: 'Spouse',
   son: 'Son',
   daughter: 'Daughter',
@@ -221,6 +250,7 @@ export const ROLE_DISPLAY_NAMES: Record<string, string> = {
 
 export const ROLE_DESCRIPTIONS: Record<string, string> = {
   family_head: 'Complete governance over workspace, budgets, members, roles, and settings.',
+  member: 'Standard family member with permission to view shared finances, log transactions, and submit requests.',
   spouse: 'Co-manages family finances, records shared income/expenses, views reports.',
   son: 'Personal allowance management, personal spending & income records, and requests to Family Head.',
   daughter: 'Personal allowance management, personal spending & income records, and requests to Family Head.',
@@ -239,6 +269,7 @@ export function normalizeRole(role: string): string {
   if (r.includes('grand')) return 'grandparent';
   if (r.includes('viewer')) return 'viewer';
   if (r.includes('adult')) return 'spouse';
+  if (r.includes('member')) return 'member';
   return r || 'viewer';
 }
 

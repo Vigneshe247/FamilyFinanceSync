@@ -46,6 +46,12 @@ export function getAuthErrorMessage(error: any): string {
   if (message.includes('Network') || message.includes('Failed to fetch')) {
     return 'Network connection failed. Please check your internet connection.';
   }
+  if (message.includes('Error sending confirmation email') || message.includes('email_provider_disabled') || message.includes('smtp_error')) {
+    return 'Supabase confirmation email could not be sent. Please disable "Confirm email" in Supabase Dashboard (Authentication -> Providers -> Email) or configure Custom SMTP.';
+  }
+  if (message.includes('over_email_send_rate_limit') || message.includes('rate limit')) {
+    return 'Email rate limit reached on Supabase. Please disable "Confirm email" in Supabase Dashboard (Authentication -> Providers -> Email) or configure Custom SMTP.';
+  }
   if (message.length < 120 && !message.includes('{"')) {
     return message;
   }

@@ -480,6 +480,46 @@ export const MembersPage: React.FC<MembersPageProps> = ({ onNavigatePermissions 
         </div>
       </div>
 
+      {/* Sole Member Encouragement Banner */}
+      {members.length <= 1 && (
+        <div
+          className="neo-card"
+          style={{
+            marginBottom: '1.5rem',
+            padding: '1.25rem 1.5rem',
+            background: 'var(--card-bg)',
+            border: '1px solid var(--brass)',
+            borderRadius: 'var(--radius-card)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
+          <div style={{ maxWidth: '650px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <UserPlus size={18} color="var(--mint-primary)" />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
+                Invite Your Family to Collaborate
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', margin: 0 }}>
+              You are the only member in this workspace. Share your unique Family Code with your spouse, children, or parents so they can join and view or manage family finances.
+            </p>
+          </div>
+          {isHead && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setInviteModalOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+            >
+              <UserPlus size={15} /> Invite Family Member
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Active Pending Invitations Section */}
       {isHead && pendingInvitations.length > 0 && (
         <div

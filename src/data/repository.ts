@@ -1,9 +1,6 @@
 /* =========================================================================
    FinanceRepository — The authoritative persistence boundary for FamilyFinanceSync.
-   Two implementations share this contract:
-     1. SupabaseFinanceRepository (Cloud: atomic RPCs + RLS)
-     2. DemoFinanceRepository     (Demo: in-browser store, same validation)
-   Components never call Supabase or localStorage directly.
+   SupabaseFinanceRepository (Cloud: atomic RPCs + PostgreSQL RLS).
    ========================================================================= */
 
 import type {

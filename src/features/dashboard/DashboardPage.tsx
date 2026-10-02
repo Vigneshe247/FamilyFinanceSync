@@ -35,6 +35,9 @@ import {
   Trash2,
   UploadCloud,
   Settings,
+  Receipt,
+  UserPlus,
+  Sparkles,
 } from 'lucide-react';
 import { useViewSettings } from '../../context/ViewSettingsContext';
 import { PrivateFinancesView } from './components/PrivateFinancesView';
@@ -59,7 +62,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     activeFamily,
     currentMember,
     activeUserId,
-    demoUsers,
     members,
     categories,
     transactions,
@@ -527,7 +529,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               }}
             >
               <Lock size={15} />
-              <span>My Private Finances ({demoUsers.find(u => u.id === activeUserId)?.name || currentMember.user.name})</span>
+              <span>My Private Finances ({currentMember?.user?.name || 'Personal'})</span>
             </button>
           </div>
 
@@ -546,6 +548,62 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </p>
             </div>
           </div>
+
+          {/* New Workspace Onboarding Guidance */}
+          {scopedTransactions.length === 0 && scopedAccounts.length === 0 && (
+            <div
+              className="neo-card"
+              style={{
+                marginBottom: '1.25rem',
+                background: 'linear-gradient(135deg, rgba(19, 42, 34, 0.95), rgba(30, 60, 48, 0.95))',
+                border: '1px solid var(--brass)',
+                color: '#FBFAF5',
+                padding: '1.25rem 1.5rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.5rem' }}>
+                <Sparkles size={20} color="var(--brass)" />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#FBFAF5' }}>
+                  Welcome to your Family Financial Workspace
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: '#D5E5DC', margin: '0 0 1rem 0', maxWidth: '720px' }}>
+                Your private ledger is set up and ready. Begin by adding your bank accounts or cash vaults, recording your initial income or expense, and inviting family members to collaborate.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-sage btn-sm"
+                  onClick={() => setActiveTab('accounts')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Landmark size={14} /> + Add Account
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => onOpenNewTx('income')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Plus size={14} /> + Add Income
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => onOpenNewTx('expense')}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Plus size={14} /> + Add Expense
+                </button>
+                {isHead && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setActiveTab('members')}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <UserPlus size={14} /> Invite Family
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="finova-grid-3col">
           {/* ================= COLUMN 1 (LEFT) ================= */}
@@ -861,33 +919,49 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {scopedAccounts.slice(0, 4).map((acc, i) => {
-                  const bgColors = ['#D5F2E2', '#E1EDFE', '#F3E8FC', '#FEF6E6'];
-                  const iconColors = ['var(--mint-primary)', 'var(--sky-accent)', 'var(--purple-accent)', 'var(--amber-accent)'];
-                  const IconComp = i === 0 ? Landmark : i === 1 ? PiggyBank : i === 2 ? ShieldCheck : Wallet;
-
-                  return (
-                    <div key={acc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div className="pastel-icon-box" style={{ background: bgColors[i % 4], color: iconColors[i % 4] }}>
-                          <IconComp size={19} />
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-main)' }}>
-                            {acc.name}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            {acc.account_number_mask || 'Physical Vault'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.88rem' }}>
-                        {formatPaise(acc.balance)}
-                      </div>
+                {scopedAccounts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1.25rem 0.5rem' }}>
+                    <Landmark size={24} style={{ color: 'var(--text-muted)', opacity: 0.6, margin: '0 auto 0.4rem', display: 'block' }} />
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.65rem' }}>
+                      No accounts added yet
                     </div>
-                  );
-                })}
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setActiveTab('accounts')}
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', borderRadius: '9999px' }}
+                    >
+                      + Add Account
+                    </button>
+                  </div>
+                ) : (
+                  scopedAccounts.slice(0, 4).map((acc, i) => {
+                    const bgColors = ['#D5F2E2', '#E1EDFE', '#F3E8FC', '#FEF6E6'];
+                    const iconColors = ['var(--mint-primary)', 'var(--sky-accent)', 'var(--purple-accent)', 'var(--amber-accent)'];
+                    const IconComp = i === 0 ? Landmark : i === 1 ? PiggyBank : i === 2 ? ShieldCheck : Wallet;
+
+                    return (
+                      <div key={acc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div className="pastel-icon-box" style={{ background: bgColors[i % 4], color: iconColors[i % 4] }}>
+                            <IconComp size={19} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--text-main)' }}>
+                              {acc.name}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {acc.account_number_mask || 'Physical Vault'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '0.88rem' }}>
+                          {formatPaise(acc.balance)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               <div
@@ -942,8 +1016,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 {scopedTransactions.length === 0 ? (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem 0' }}>
-                    No recent transactions found.
+                  <div style={{ textAlign: 'center', padding: '1.5rem 0.75rem' }}>
+                    <Receipt size={26} style={{ color: 'var(--text-muted)', opacity: 0.6, margin: '0 auto 0.4rem', display: 'block' }} />
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.2rem' }}>
+                      No Transactions Yet
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginBottom: '0.85rem' }}>
+                      Record your first income or expense to activate the family ledger.
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                      <button
+                        className="btn btn-sage btn-sm"
+                        onClick={() => onOpenNewTx('income')}
+                        style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem', borderRadius: '9999px' }}
+                      >
+                        + Income
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => onOpenNewTx('expense')}
+                        style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem', borderRadius: '9999px' }}
+                      >
+                        + Expense
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   scopedTransactions.slice(0, 7).map(tx => {

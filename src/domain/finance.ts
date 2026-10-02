@@ -6,6 +6,8 @@
    ========================================================= */
 
 import { Transaction, Account, Budget, FamilyMember, Category } from '../types';
+import { DEFAULT_APPROVAL_THRESHOLDS } from '../constants/systemData';
+import { normalizeRoleId } from './permissions';
 
 export const FAMILY_TIMEZONE = 'Asia/Kolkata';
 
@@ -453,4 +455,43 @@ export function summarizeFamilyPeriod(
     activeMembers: active.length,
     rows,
   };
+}
+
+/* -------------------- Approval Rules Engine (Section E) -------------------- */
+
+export type ApprovalRequirement = 'auto' | 'co_manager_or_head' | 'head_only';
+
+/**
+ * Determines approval requirements based on amount and member status (Section E).
+ * - Child: Rs 0 (always requires approval)
+ * - Adult <= Rs 500 (50,000 paise): Auto-approved
+ * - Adult Rs 500 - Rs 2,000 (50,001 - 200,000 paise): Co-Manager or Head
+ * - Adult > Rs 2,000 (> 200,000 paise): Head only
+ */
+export function getApprovalRequirement(amountPaise: number, isChild = false): ApprovalRequirement {
+  if (isChild) {
+    return amountPaise <= DEFAULT_APPROVAL_THRESHOLDS.CO_MANAGER_APPROVAL_MAX_PAISE
+      ? 'co_manager_or_head'
+      : 'head_only';
+  }
+  if (amountPaise <= DEFAULT_APPROVAL_THRESHOLDS.ADULT_AUTO_APPROVE_MAX_PAISE) {
+    return 'auto';
+  }
+  if (amountPaise <= DEFAULT_APPROVAL_THRESHOLDS.CO_MANAGER_APPROVAL_MAX_PAISE) {
+    return 'co_manager_or_head';
+  }
+  return 'head_only';
+}
+
+/**
+ * Checks whether a given role is authorized to approve an expense request of a given amount.
+ */
+export function canRoleApprove(role: string, amountPaise: number, isOwner = false): boolean {
+  if (isOwner) return true;
+  const canonical = normalizeRoleId(role);
+  if (canonical === 'FAMILY_HEAD') return true;
+  if (canonical === 'SPOUSE' || role === 'CO_MANAGER') {
+    return amountPaise <= DEFAULT_APPROVAL_THRESHOLDS.CO_MANAGER_APPROVAL_MAX_PAISE;
+  }
+  return false;
 }

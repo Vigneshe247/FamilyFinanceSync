@@ -156,14 +156,21 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({ onOpenNewRequest }) 
       {/* Requests List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {displayedRequests.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--ink-muted)' }}>
-            <CheckCircle size={36} color="var(--sage)" style={{ margin: '0 auto 0.75rem' }} />
+          <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--ink-muted)' }}>
+            <CheckCircle size={36} color="var(--sage)" style={{ margin: '0 auto 0.75rem', display: 'block' }} />
             <div style={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--ink)' }}>
-              No requests in this queue
+              {requests.length === 0 ? 'No Expense Requests Yet' : 'No requests in this queue'}
             </div>
-            <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
-              All family members' requests for this filter have been addressed.
+            <p style={{ fontSize: '0.85rem', marginTop: '0.25rem', maxWidth: '420px', margin: '0.25rem auto 1.25rem' }}>
+              {requests.length === 0
+                ? 'Family members and children can submit spending requests here for parental or co-manager approval.'
+                : "All family members' requests for this filter have been addressed."}
             </p>
+            {hasPermission('requests.create') && (
+              <button className="btn btn-primary btn-sm" onClick={onOpenNewRequest}>
+                <Plus size={14} /> + New Expense Request
+              </button>
+            )}
           </div>
         ) : (
           displayedRequests.map(req => {

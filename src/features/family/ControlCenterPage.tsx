@@ -58,6 +58,8 @@ export const ControlCenterPage: React.FC<ControlCenterPageProps> = ({ setActiveT
     toggleTheme,
   } = useFamilyFinance();
 
+
+
   const role = currentMember?.role || 'FAMILY_HEAD';
   const normRole = (currentMember?.role || '').toLowerCase();
   const isHead = normRole === 'family_head' || normRole.includes('head');
@@ -753,6 +755,7 @@ export const ControlCenterPage: React.FC<ControlCenterPageProps> = ({ setActiveT
             })}
           </div>
         </div>
+
 
       </div>
     </div>

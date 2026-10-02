@@ -15,9 +15,9 @@ import {
 } from "../services/authService";
 import { supabase, supabaseAuthService } from "../services/supabase";
 import { FirestoreUserDocument } from "../types/firestore";
-import { DEMO_MEMBERS } from "../data/seedData";
 
 import { getUserMemberships, UserFamilyMembership } from "../services/familyService";
+import { setSentryUser } from "../services/sentryService";
 
 interface AuthContextType {
   user: any;
@@ -31,7 +31,6 @@ interface AuthContextType {
   refreshMemberships: () => Promise<UserFamilyMembership[]>;
   logout: () => Promise<void>;
   devSimulateVerify: () => Promise<void>;
-  loginAsDemoMember: (memberId?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -46,7 +45,6 @@ const AuthContext = createContext<AuthContextType>({
   refreshMemberships: async () => [],
   logout: async () => {},
   devSimulateVerify: async () => {},
-  loginAsDemoMember: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -66,66 +64,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return mems;
   };
 
+  const syncUserProfileAndMemberships = async (sbUser: any): Promise<UserFamilyMembership[]> => {
+    setUser(sbUser);
+    setSentryUser(sbUser.id);
+
+    let profileData: any = null;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', sbUser.id)
+        .maybeSingle();
+      if (!error && data) {
+        profileData = data;
+      }
+    } catch (e) {
+      console.warn('Profile fetch notice:', e);
+    }
+
+    const fullName =
+      profileData?.full_name ||
+      profileData?.first_name ||
+      sbUser.user_metadata?.full_name ||
+      sbUser.email?.split('@')[0] ||
+      'Member User';
+    const nameParts = fullName.split(' ');
+
+    setUserProfile({
+      uid: sbUser.id,
+      firstName: nameParts[0] || 'User',
+      lastName: nameParts.slice(1).join(' ') || '',
+      displayName: fullName,
+      email: profileData?.email || sbUser.email || '',
+      mobile: profileData?.phone || sbUser.phone || '',
+      photoURL: profileData?.avatar_url || sbUser.user_metadata?.avatar_url || '',
+      emailVerified: Boolean(sbUser.email_confirmed_at || sbUser.emailVerified || true),
+      familyId: '',
+      status: 'active',
+      createdAt: profileData?.created_at || sbUser.created_at || new Date().toISOString(),
+      updatedAt: profileData?.updated_at || new Date().toISOString(),
+    });
+
+    const mems = await getUserMemberships(sbUser.id);
+    setMemberships(mems);
+    return mems;
+  };
+
   useEffect(() => {
-    // 1. Check Supabase session first
+    // 1. Check existing Supabase session first
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session && session.user) {
-        const sbUser = session.user;
-        setUser(sbUser);
-        const nameParts = (sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || "Member User").split(" ");
-        setUserProfile({
-          uid: sbUser.id,
-          firstName: nameParts[0] || "User",
-          lastName: nameParts.slice(1).join(" ") || "",
-          displayName: sbUser.user_metadata?.full_name || nameParts[0] || "Member User",
-          email: sbUser.email || "",
-          mobile: sbUser.phone || "",
-          photoURL: sbUser.user_metadata?.avatar_url || "",
-          emailVerified: true,
-          familyId: "",
-          status: "active",
-          createdAt: sbUser.created_at,
-          updatedAt: new Date().toISOString(),
-        });
-        const mems = await getUserMemberships(sbUser.id);
-        setMemberships(mems);
+        await syncUserProfileAndMemberships(session.user);
         setLoading(false);
       } else {
         setUser(null);
+        setSentryUser(null);
         setUserProfile(null);
         setMemberships([]);
         setLoading(false);
       }
     });
 
-    // 2. Supabase Auth state listener
+    // 2. Supabase Auth state listener for all auth events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session && session.user) {
-        const sbUser = session.user;
-        setUser(sbUser);
-        const fullName = sbUser.user_metadata?.full_name || sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || "Member User";
-        const nameParts = fullName.split(" ");
-
-        setUserProfile({
-          uid: sbUser.id,
-          firstName: nameParts[0] || "User",
-          lastName: nameParts.slice(1).join(" ") || "",
-          displayName: fullName,
-          email: sbUser.email || "",
-          mobile: sbUser.phone || "",
-          photoURL: sbUser.user_metadata?.avatar_url || "",
-          emailVerified: true,
-          familyId: "",
-          status: "active",
-          createdAt: sbUser.created_at,
-          updatedAt: new Date().toISOString(),
-        });
-        const mems = await getUserMemberships(sbUser.id);
-        setMemberships(mems);
+        await syncUserProfileAndMemberships(session.user);
+        setLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        setSentryUser(null);
         setUserProfile(null);
         setMemberships([]);
+        setLoading(false);
       }
     });
 
@@ -134,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!user) {
         setUser(mockUser);
         if (mockUser) {
+          setSentryUser(mockUser.uid);
           const nameParts = (mockUser.displayName || "Family Head").split(" ");
           setUserProfile({
             uid: mockUser.uid,
@@ -150,6 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updatedAt: new Date().toISOString(),
           });
         } else {
+          setSentryUser(null);
           setUserProfile(null);
         }
       }
@@ -186,44 +198,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async (): Promise<void> => {
     await logoutUser();
     setUser(null);
+    setSentryUser(null);
     setUserProfile(null);
     setLocalVerifiedOverride(false);
-  };
-
-  const loginAsDemoMember = async (memberId: string = 'mem-raj'): Promise<void> => {
-    const member = DEMO_MEMBERS.find(m => m.id === memberId) || DEMO_MEMBERS[0];
-    const demoUser = {
-      uid: member.user_id,
-      email: member.user.email,
-      displayName: member.user.name,
-      emailVerified: true,
-      phoneNumber: "+91 98765 43210",
-      photoURL: member.user.avatar_url || "",
-      role: member.role,
-      reload: async () => {},
-    };
-
-    localStorage.setItem("ffs_current_mock_user", JSON.stringify(demoUser));
-    localStorage.setItem("ffs_demo_v2_active_member_id", JSON.stringify(member.id));
-    localStorage.setItem("ffs_demo_v2_is_demo_mode", JSON.stringify(true));
-
-    setUser(demoUser);
-    const nameParts = member.user.name.split(" ");
-    setUserProfile({
-      uid: member.user_id,
-      firstName: nameParts[0] || "User",
-      lastName: nameParts.slice(1).join(" ") || "",
-      displayName: member.user.name,
-      email: member.user.email,
-      mobile: "+91 98765 43210",
-      photoURL: member.user.avatar_url || "",
-      emailVerified: true,
-      familyId: "fam-demo-001",
-      status: "active",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    setLocalVerifiedOverride(true);
   };
 
   const isEmailVerified = Boolean(
@@ -248,7 +225,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshMemberships,
         logout,
         devSimulateVerify,
-        loginAsDemoMember,
       }}
     >
       {children}

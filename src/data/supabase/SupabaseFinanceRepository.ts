@@ -67,7 +67,7 @@ export class SupabaseFinanceRepository implements FinanceRepository {
         notifications,
         myPerms,
       ] = await Promise.all([
-        this.db.from('families').select('*').eq('id', familyId).single(),
+        this.db.from('families').select('*').eq('id', familyId).maybeSingle(),
         this.db.from('family_members').select('*').eq('family_id', familyId),
         this.db.from('roles').select('*').order('sort_order'),
         this.db.from('role_permissions').select('role_id, permission_id'),
@@ -339,7 +339,7 @@ export class SupabaseFinanceRepository implements FinanceRepository {
       p_timezone: patch.timezone ?? null,
     });
 
-    const { data, error } = await this.db.from('families').select('*').eq('id', familyId).single();
+    const { data, error } = await this.db.from('families').select('*').eq('id', familyId).maybeSingle();
     if (error) throw toRepositoryError(error);
     return mapFamily(data);
   }

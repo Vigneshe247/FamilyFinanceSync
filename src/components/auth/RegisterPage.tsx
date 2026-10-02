@@ -170,20 +170,48 @@ export const RegisterPage: React.FC = () => {
         <div
           style={{
             background: "#FEF2F2",
-            color: "#DC2626",
-            padding: "0.75rem 1rem",
-            borderRadius: "8px",
+            color: "#991B1B",
+            padding: "0.85rem 1rem",
+            borderRadius: "10px",
             fontSize: "0.85rem",
-            fontWeight: 500,
             display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
+            alignItems: "flex-start",
+            gap: "0.6rem",
             marginBottom: "1.5rem",
-            border: "1px solid #FEE2E2",
+            border: "1px solid #FECACA",
           }}
         >
-          <AlertCircle size={18} style={{ flexShrink: 0 }} />
-          <span>{errorMessage}</span>
+          <AlertCircle size={18} style={{ color: "#DC2626", flexShrink: 0, marginTop: "2px" }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600 }}>{errorMessage}</div>
+            {(errorMessage.includes("confirmation email") || errorMessage.includes("Confirm email") || errorMessage.includes("rate limit")) && (
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  fontSize: "0.78rem",
+                  color: "#7F1D1D",
+                  lineHeight: 1.5,
+                  background: "#FEE2E2",
+                  padding: "0.6rem 0.8rem",
+                  borderRadius: "8px",
+                  border: "1px solid #FCA5A5",
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: "0.2rem" }}>Quick Fix (Supabase Dashboard):</div>
+                <div style={{ marginBottom: "0.25rem" }}>
+                  Supabase built-in mailer has a limit of 3 emails/hr. To enable instant registration without errors:
+                </div>
+                <ol style={{ margin: "0.2rem 0 0", paddingLeft: "1.2rem" }}>
+                  <li>Open your <strong>Supabase Dashboard &rarr; Authentication &rarr; Providers &rarr; Email</strong></li>
+                  <li>Toggle <strong>OFF &quot;Confirm email&quot;</strong> and click <strong>Save</strong></li>
+                  <li>Click &quot;Create Account&quot; again to register and log in instantly!</li>
+                </ol>
+                <div style={{ marginTop: "0.4rem", fontSize: "0.75rem", color: "#991B1B" }}>
+                  <em>Note: To receive confirmation emails in your Gmail inbox, configure Custom SMTP in Supabase Project Settings &rarr; Authentication &rarr; SMTP.</em>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

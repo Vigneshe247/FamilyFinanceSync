@@ -19,6 +19,7 @@ import {
   Sparkles,
   Calendar,
   Settings,
+  Receipt,
 } from 'lucide-react';
 import { AccountTransferModal } from '../../components/modals/AccountTransferModal';
 import { TransactionDetailsModal } from '../../components/modals/TransactionDetailsModal';
@@ -392,8 +393,50 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({ onOpenNewTx 
             <tbody>
               {sortedTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-muted)' }}>
-                    No transactions match your current search filters.
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                    {transactions.length === 0 ? (
+                      <div style={{ maxWidth: '440px', margin: '0 auto' }}>
+                        <Receipt size={36} style={{ color: 'var(--brass)', opacity: 0.7, margin: '0 auto 0.75rem', display: 'block' }} />
+                        <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--ink)', marginBottom: '0.35rem' }}>
+                          No Transactions in Ledger
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: '1.25rem' }}>
+                          Start tracking family cashflow by manually logging your first income deposit or expense entry.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <button
+                            className="btn btn-sage btn-sm"
+                            onClick={() => onOpenNewTx('income')}
+                          >
+                            + Add Income
+                          </button>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => onOpenNewTx('expense')}
+                          >
+                            + Add Expense
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>
+                          No transactions match your current search filters.
+                        </div>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setSearch('');
+                            setFilterCategory('all');
+                            setFilterMember('all');
+                            setFilterType('all');
+                          }}
+                          style={{ marginTop: '0.5rem' }}
+                        >
+                          Clear Filters
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (

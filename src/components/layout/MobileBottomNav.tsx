@@ -33,7 +33,7 @@ interface MobileBottomNavProps {
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, setActiveTab }) => {
-  const { currentMember, requests, hasPermission, resetToDemoDefaults } = useFamilyFinance();
+  const { currentMember, requests, hasPermission } = useFamilyFinance();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   const pendingRequestsCount = requests.filter(r => r.status === 'pending').length;

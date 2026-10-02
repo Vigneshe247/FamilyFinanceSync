@@ -65,9 +65,7 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
     allFamilies,
     linkedFamilies,
     switchActiveFamily,
-    demoUsers,
     activeUserId,
-    switchDemoUser,
     members,
     currentMember,
     switchMember,
@@ -77,21 +75,18 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
     theme,
     toggleTheme,
     requests,
-    isDemoMode,
   } = useFamilyFinance();
 
   const { user, logout } = useAuth();
   const { navigate } = useRouter();
 
-    const [familyDropdownOpen, setFamilyDropdownOpen] = useState(false);
+  const [familyDropdownOpen, setFamilyDropdownOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [demoUserDropdownOpen, setDemoUserDropdownOpen] = useState(false);
   const [createFamilyModalOpen, setCreateFamilyModalOpen] = useState(false);
   const [joinFamilyModalOpen, setJoinFamilyModalOpen] = useState(false);
   const [myFamiliesModalOpen, setMyFamiliesModalOpen] = useState(false);
 
   const familyMenuRef = useRef<HTMLDivElement>(null);
-  const demoUserMenuRef = useRef<HTMLDivElement>(null);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
@@ -104,9 +99,6 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
     function handleClickOutside(event: MouseEvent) {
       if (familyMenuRef.current && !familyMenuRef.current.contains(event.target as Node)) {
         setFamilyDropdownOpen(false);
-      }
-      if (demoUserMenuRef.current && !demoUserMenuRef.current.contains(event.target as Node)) {
-        setDemoUserDropdownOpen(false);
       }
       if (roleMenuRef.current && !roleMenuRef.current.contains(event.target as Node)) {
         setRoleDropdownOpen(false);
@@ -149,7 +141,7 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
     { id: 'recurring', label: 'Bills & Recurring', icon: Repeat, desc: 'Subscriptions & automated ledger', hidden: isChild },
   ];
 
-    const currentActiveFamily = activeFamily || family || allFamilies?.[0] || { id: 'fam-demo-001', name: 'Vignesh Family', currency: 'INR' };
+  const currentActiveFamily = (activeFamily && activeFamily.name) ? activeFamily : (family && family.name ? family : (allFamilies?.[0] || { id: '', name: 'Family Workspace', currency: 'INR' }));
   const moreModules = allMoreModules.filter(m => !m.hidden);
   const isMoreModuleActive = moreModules.some(m => m.id === activeTab);
   const activeMoreModule = moreModules.find(m => m.id === activeTab);
@@ -860,8 +852,8 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                 </button>
               </div>
 
-              {/* Role Perspective Switcher for Testing - Demo Mode Only */}
-              {isDemoMode && (
+              {/* Role Perspective Switcher - DEV ONLY for layout/role preview (Section A4) */}
+              {import.meta.env.DEV && members && members.length > 1 && (
                 <>
                   <div
                     style={{
@@ -874,12 +866,12 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                       borderTop: '1px solid var(--border-subtle)',
                     }}
                   >
-                    Switch Role Perspective
+                    [DEV Preview] Switch Perspective
                   </div>
 
                   <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
                     {members.map(member => {
-                      const isSelected = member.id === currentMember.id;
+                      const isSelected = member.id === currentMember?.id;
                       return (
                         <div
                           key={member.id}
@@ -900,12 +892,12 @@ export const TopMenubar: React.FC<TopMenubarProps> = ({
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <img
-                              src={member.user.avatar_url}
-                              alt={member.user.name}
+                              src={member.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.id}`}
+                              alt={member.user?.name || 'Member'}
                               style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
                             />
                             <div>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 600 }}>{member.user.name}</div>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 600 }}>{member.user?.name || 'Member'}</div>
                               <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                                 {ROLE_DISPLAY_NAMES[normalizeRole(member.role)] || member.role.replace('_', ' ')}
                               </div>

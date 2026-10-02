@@ -218,8 +218,24 @@ export const InvestmentsPage: React.FC = () => {
 
       {/* Holdings Grid */}
       <div className="grid-2col">
-        {investments.map(inv => {
-          const pnl = inv.current_value - inv.invested_amount;
+        {investments.length === 0 ? (
+          <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+            <TrendingUp size={40} style={{ color: 'var(--sage)', margin: '0 auto 1rem', display: 'block', opacity: 0.8 }} />
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--ink)', marginBottom: '0.5rem' }}>
+              No Investments Recorded
+            </h3>
+            <p style={{ color: 'var(--ink-muted)', fontSize: '0.88rem', maxWidth: '440px', margin: '0 auto 1.5rem' }}>
+              Track your family portfolio across Mutual Funds, Fixed Deposits, Gold, Stocks, PPF/NPS, and Real Estate.
+            </p>
+            {canManage && (
+              <button className="btn btn-primary" onClick={() => setAddModalOpen(true)}>
+                <Plus size={15} /> + Add First Investment Asset
+              </button>
+            )}
+          </div>
+        ) : (
+          investments.map(inv => {
+            const pnl = inv.current_value - inv.invested_amount;
           const pnlPct = inv.invested_amount > 0 ? ((pnl / inv.invested_amount) * 100).toFixed(1) : '0.0';
           const pnlPos = pnl >= 0;
 
@@ -297,7 +313,7 @@ export const InvestmentsPage: React.FC = () => {
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
 
       {/* Add Investment Modal */}

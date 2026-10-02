@@ -134,6 +134,7 @@ export interface Family {
   id: string;
   name: string;
   owner_id: string;
+  created_by?: string;
   currency: string; // Default: 'INR'
   timezone: string;
   invite_code?: string;
@@ -283,6 +284,10 @@ export interface Transaction {
   receipt_url?: string;
   from_account_id?: string;
   to_account_id?: string;
+  source?: 'manual' | 'import' | 'recurring' | string;
+  source_file_id?: string;
+  import_batch_id?: string;
+  fingerprint?: string;
   created_at: string;
   updated_at: string;
 }

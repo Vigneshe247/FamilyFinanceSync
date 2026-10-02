@@ -29,33 +29,23 @@ import {
 } from '../types';
 import { useAuth } from './AuthContext';
 import { supabaseDataService } from '../services/supabaseDataService';
-import { calculateFamilySummary, FamilyFinancialSummary } from '../utils/financialEngine';
+import { calculateFamilySummary, FamilyFinancialSummary, canRoleApprove } from '../utils/financialEngine';
 import { getFamilyChannel } from '../lib/realtime/domain/familyRealtime';
 import {
-  DEMO_FAMILY,
-  DEMO_FAMILIES,
-  DEMO_MEMBERS,
-  DEMO_USERS,
-  USER_LINKED_FAMILIES,
-  DemoUserOption,
   ROLE_DEFINITIONS,
-  DEMO_CATEGORIES,
-  DEMO_ACCOUNTS,
-  DEMO_BUDGET,
-  DEMO_TRANSACTIONS,
-  DEMO_SAVINGS_GOALS,
-  DEMO_REQUESTS,
-  DEMO_RECURRING,
-  DEMO_APPROVAL_RULES,
-  DEMO_NOTIFICATIONS,
-  DEMO_AUDIT_LOGS,
-  DEMO_LOANS,
-  DEMO_INVESTMENTS,
-  DEMO_SHARED_EXPENSES,
   SYSTEM_PERMISSIONS,
-} from '../data/seedData';
+  SYSTEM_CATEGORY_TEMPLATES,
+  DEFAULT_APPROVAL_THRESHOLDS,
+} from '../constants/systemData';
+
+export interface DemoUserOption {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+}
 import { normalizeRole } from '../utils/permissions';
-import { generateFamilyCode } from '../services/familyService';
+import { generateFamilyCode, getKnownProfiles, saveKnownProfile } from '../services/familyService';
 
 interface FamilyFinanceContextType {
   // Privacy & Linked Family Architecture (Section 1-37)
@@ -168,6 +158,8 @@ interface FamilyFinanceContextType {
     transactions?: Partial<Transaction>[];
     savingsGoals?: Partial<SavingsGoal>[];
   }) => void;
+  addImportedTransactions: (newTxs: Transaction[]) => void;
+  removeImportBatchTransactions: (batchId: string) => void;
   createFamilyWorkspace: (familyName: string, currency?: string, timezone?: string) => FamilyMember;
   lookupInvitation: (inviteCodeOrLink: string) => { found: boolean; invitation?: FamilyInvitation; familyName: string; inviterName: string; assignedRole: SystemRoleType } | null;
   acceptInvitation: (inviteCodeOrLink: string, userName: string, userEmail: string) => FamilyMember;
@@ -177,24 +169,39 @@ interface FamilyFinanceContextType {
 
 const FamilyFinanceContext = createContext<FamilyFinanceContextType | undefined>(undefined);
 
-const STORAGE_PREFIX = 'ffs_demo_privacy_v1_';
+const EMPTY_FAMILY: Family = {
+  id: '',
+  name: '',
+  owner_id: '',
+  currency: 'INR',
+  timezone: 'Asia/Kolkata',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
 
-function loadStorage<T>(key: string, fallback: T): T {
-  try {
-    const saved = localStorage.getItem(STORAGE_PREFIX + key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
-  }
-}
+const EMPTY_BUDGET: Budget = {
+  id: '',
+  family_id: '',
+  name: 'Family Budget',
+  period: 'monthly',
+  start_date: new Date().toISOString().slice(0, 10),
+  end_date: new Date().toISOString().slice(0, 10),
+  total_amount: 0,
+  created_by: '',
+  categories: [],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
 
-function saveStorage<T>(key: string, data: T): void {
-  try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
-  } catch (err) {
-    console.error('Failed to save to localStorage:', err);
-  }
-}
+const INITIAL_CATEGORIES: Category[] = SYSTEM_CATEGORY_TEMPLATES.map((cat, idx) => ({
+  id: `cat-sys-${idx + 1}`,
+  family_id: '',
+  name: cat.name,
+  type: cat.type,
+  icon: cat.icon,
+  color: cat.color,
+  is_default: true,
+}));
 
 export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -203,60 +210,43 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
 
   const { user, memberships, isAuthenticated } = useAuth();
 
-  const [family, setFamily] = useState<Family>(() => loadStorage('family', DEMO_FAMILY));
-  const [members, setMembers] = useState<FamilyMember[]>(() => {
-    const loaded = loadStorage<FamilyMember[]>('members', DEMO_MEMBERS);
-    return loaded && loaded.length > 0 ? loaded : DEMO_MEMBERS;
-  });
-  const [currentMemberId, setCurrentMemberId] = useState<string>(() => loadStorage('active_member_id', 'mem-vignesh'));
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => loadStorage('is_demo_mode', true));
+  const [family, setFamily] = useState<Family>(EMPTY_FAMILY);
+  const [members, setMembers] = useState<FamilyMember[]>([]);
+  const [currentMemberId, setCurrentMemberId] = useState<string>('');
+  const [isDemoMode] = useState<boolean>(false);
 
   const checkReadOnly = useCallback((): boolean => {
     return false;
   }, []);
 
-  const [categories] = useState<Category[]>(() => loadStorage('categories', DEMO_CATEGORIES));
-  const [roles, setRoles] = useState<RoleDefinition[]>(() => loadStorage('roles', ROLE_DEFINITIONS));
-  const [accounts, setAccounts] = useState<Account[]>(() => loadStorage('accounts', DEMO_ACCOUNTS));
-  const [transactions, setTransactions] = useState<Transaction[]>(() => loadStorage('transactions', DEMO_TRANSACTIONS));
-  const [budget, setBudget] = useState<Budget>(() => loadStorage('budget', DEMO_BUDGET));
-  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(() => loadStorage('savings_goals', DEMO_SAVINGS_GOALS));
-  const [requests, setRequests] = useState<ExpenseRequest[]>(() => loadStorage('requests', DEMO_REQUESTS));
-  const [recurring, setRecurring] = useState<RecurringTransaction[]>(() => loadStorage('recurring', DEMO_RECURRING));
-  const [approvalRules] = useState<ApprovalRule[]>(() => loadStorage('approval_rules', DEMO_APPROVAL_RULES));
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => loadStorage('notifications', DEMO_NOTIFICATIONS));
-  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => loadStorage('audit_logs', DEMO_AUDIT_LOGS));
-  const [loans, setLoans] = useState<LoanItem[]>(() => loadStorage('loans', DEMO_LOANS));
-  const [investments, setInvestments] = useState<InvestmentAsset[]>(() => loadStorage('investments', DEMO_INVESTMENTS));
-  const [sharedExpenses, setSharedExpenses] = useState<SharedExpenseSplit[]>(() => loadStorage('shared_expenses', DEMO_SHARED_EXPENSES));
-  const [invitations, setInvitations] = useState<FamilyInvitation[]>(() => loadStorage('invitations', []));
-  const [allowances, setAllowances] = useState<AllowanceConfig[]>(() => loadStorage('allowances', []));
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [roles, setRoles] = useState<RoleDefinition[]>(ROLE_DEFINITIONS);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budget, setBudget] = useState<Budget>(EMPTY_BUDGET);
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [requests, setRequests] = useState<ExpenseRequest[]>([]);
+  const [recurring, setRecurring] = useState<RecurringTransaction[]>([]);
+  const [approvalRules] = useState<ApprovalRule[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
+  const [loans, setLoans] = useState<LoanItem[]>([]);
+  const [investments, setInvestments] = useState<InvestmentAsset[]>([]);
+  const [sharedExpenses, setSharedExpenses] = useState<SharedExpenseSplit[]>([]);
+  const [invitations, setInvitations] = useState<FamilyInvitation[]>([]);
+  const [allowances, setAllowances] = useState<AllowanceConfig[]>([]);
 
   // Privacy & Linked Family State
-  const [allFamilies, setAllFamilies] = useState<Family[]>(() => loadStorage('all_families', DEMO_FAMILIES));
-  const [activeUserId, setActiveUserId] = useState<string>(() => loadStorage('active_demo_user_id', 'user-vignesh'));
-  const [linkedFamiliesMap, setLinkedFamiliesMap] = useState<Record<string, FamilyMembership[]>>(() => loadStorage('linked_families_map', USER_LINKED_FAMILIES));
+  const [allFamilies, setAllFamilies] = useState<Family[]>([]);
+  const [activeUserId, setActiveUserId] = useState<string>('');
+  const [linkedFamiliesMap, setLinkedFamiliesMap] = useState<Record<string, FamilyMembership[]>>({});
 
   // Sync real user session and active family when logged in
   useEffect(() => {
     if (isAuthenticated && user?.id) {
       setActiveUserId(user.id);
-      saveStorage('active_demo_user_id', user.id);
 
       if (memberships && memberships.length > 0) {
-        setIsDemoMode(false);
-        saveStorage('is_demo_mode', false);
-
-        // Purge legacy demo members from localStorage cache
-        try {
-          const cachedMems = loadStorage<any[]>('members', []);
-          const cleanMems = cachedMems.filter(m => !m.id?.startsWith('mem-') && !m.user_id?.startsWith('user-') && m.family_id !== 'fam-demo-001');
-          saveStorage('members', cleanMems);
-          setMembers(cleanMems);
-        } catch (e) {
-          console.warn('Failed to purge cached demo members:', e);
-        }
-
         const primaryMem = memberships[0];
         if (primaryMem && primaryMem.family_id) {
           const famCode = primaryMem.invite_code || generateFamilyCode();
@@ -270,33 +260,40 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
             invite_code: famCode,
             family_code: famCode,
             timezone: 'Asia/Kolkata',
-            created_at: primaryMem.created_at || new Date().toISOString(),
+            created_at: primaryMem.joined_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
 
           setFamily(syncedFam);
-          saveStorage('family', syncedFam);
         }
+      } else {
+        setFamily(EMPTY_FAMILY);
+        setMembers([]);
+        setTransactions([]);
+        setAccounts([]);
       }
+    } else {
+      setFamily(EMPTY_FAMILY);
+      setMembers([]);
+      setTransactions([]);
+      setAccounts([]);
     }
   }, [user, memberships, isAuthenticated]);
 
-  useEffect(() => saveStorage('all_families', allFamilies), [allFamilies]);
-  useEffect(() => saveStorage('active_demo_user_id', activeUserId), [activeUserId]);
-  useEffect(() => saveStorage('linked_families_map', linkedFamiliesMap), [linkedFamiliesMap]);
-
-  const activeFamily = family || allFamilies?.[0] || DEMO_FAMILIES[0];
-  const linkedFamilies = linkedFamiliesMap[activeUserId] || [
-    {
-      family_id: family.id,
-      family_name: family.name,
-      role: 'member',
-      status: 'active',
-      member_count: 1,
-      description: family.description,
-      currency: family.currency,
-    }
-  ];
+  const activeFamily = family.id ? family : allFamilies?.[0] || EMPTY_FAMILY;
+  const linkedFamilies = (activeUserId && linkedFamiliesMap[activeUserId]) || (
+    family.id ? [
+      {
+        family_id: family.id,
+        family_name: family.name,
+        role: 'member' as const,
+        status: 'active' as const,
+        member_count: members.length || 1,
+        description: family.description,
+        currency: family.currency,
+      }
+    ] : []
+  );
 
   // Scoped Data Collections
   const activeFamilyMembers = React.useMemo(() => {
@@ -308,10 +305,12 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
       return true;
     });
 
-    if (list.length === 0 && user && !isDemoMode) {
-      const userRole = (memberships?.[0]?.role as SystemRoleType) || 'family_head';
+    // Ensure the currently logged-in user is always present in their family members list
+    if (user && !isDemoMode && !list.some(m => m.user_id === user.id || m.id === user.id)) {
+      const activeMem = memberships?.find(mem => mem.family_id === family.id) || memberships?.[0];
+      const userRole = (activeMem?.role as SystemRoleType) || 'family_head';
       const now = new Date().toISOString();
-      return [{
+      list.unshift({
         id: user.id,
         family_id: family.id,
         user_id: user.id,
@@ -328,7 +327,7 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
           created_at: user.created_at || now,
           updated_at: user.updated_at || now,
         }
-      }];
+      });
     }
 
     return list;
@@ -337,28 +336,25 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
   // Authorized Transactions for active user
   const authorizedTransactions = React.useMemo(() => {
     return transactions.filter(tx => {
-      if (!isDemoMode && (tx.id.startsWith('tx-') || (tx.family_id && tx.family_id.startsWith('fam-demo')))) return false;
       if (tx.user_id === activeUserId) return true;
-      if (tx.family_id === family.id && (tx.visibility === 'family' || tx.visibility === 'FAMILY_SHARED' || tx.is_shared)) return true;
+      if (family.id && tx.family_id === family.id && (tx.visibility === 'family' || tx.visibility === 'FAMILY_SHARED' || tx.is_shared)) return true;
       return false;
     });
-  }, [transactions, activeUserId, family.id, isDemoMode]);
+  }, [transactions, activeUserId, family.id]);
 
   // Family Transactions: ONLY shared family transactions for active family
   const familyTransactions = React.useMemo(() => {
     return transactions.filter(tx => {
-      if (!isDemoMode && (tx.id.startsWith('tx-') || (tx.family_id && tx.family_id.startsWith('fam-demo')))) return false;
-      return tx.family_id === family.id && (tx.visibility === 'family' || tx.visibility === 'FAMILY_SHARED' || (tx.is_shared && tx.visibility !== 'private'));
+      return Boolean(family.id && tx.family_id === family.id && (tx.visibility === 'family' || tx.visibility === 'FAMILY_SHARED' || (tx.is_shared && tx.visibility !== 'private')));
     });
-  }, [transactions, family.id, isDemoMode]);
+  }, [transactions, family.id]);
 
   // Private Transactions: ONLY created by active user and marked private
   const privateTransactions = React.useMemo(() => {
     return transactions.filter(tx => {
-      if (!isDemoMode && (tx.id.startsWith('tx-') || (tx.family_id && tx.family_id.startsWith('fam-demo')))) return false;
       return tx.user_id === activeUserId && (tx.visibility === 'private' || tx.visibility === 'PERSONAL' || tx.family_id === null || !tx.is_shared);
     });
-  }, [transactions, activeUserId, isDemoMode]);
+  }, [transactions, activeUserId]);
 
   // Private Summary calculations (Section 5)
   const privateSummary = React.useMemo(() => {
@@ -499,8 +495,21 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
     supabaseDataService.fetchFamilyWorkspace(family.id).then(data => {
       if (data) {
         if (data.members && data.members.length > 0) {
+          const knownProfiles = getKnownProfiles();
           const fetchedMembers: FamilyMember[] = data.members.map((m: any) => {
             const now = new Date().toISOString();
+            const isMe = user && m.user_id === user.id;
+            const profile = knownProfiles[m.user_id];
+            const memberName = isMe
+              ? (user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me')
+              : (profile?.name || m.user?.name || (m.role === 'family_head' ? 'Family Head' : `Member (${m.user_id.slice(0, 6)})`));
+            const memberEmail = isMe
+              ? (user.email || '')
+              : (profile?.email || m.user?.email || '');
+            const avatarUrl = isMe
+              ? (user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`)
+              : (profile?.avatar_url || m.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user_id}`);
+
             return {
               id: m.id || m.user_id,
               family_id: m.family_id,
@@ -512,11 +521,11 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
               custom_permissions: m.custom_permissions || {},
               user: {
                 id: m.user_id,
-                name: m.profiles?.full_name || m.profiles?.first_name || m.profiles?.email?.split('@')[0] || 'Family Member',
-                email: m.profiles?.email || '',
-                avatar_url: m.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user_id}`,
-                created_at: m.profiles?.created_at || now,
-                updated_at: m.profiles?.updated_at || now,
+                name: memberName,
+                email: memberEmail,
+                avatar_url: avatarUrl,
+                created_at: m.created_at || now,
+                updated_at: m.updated_at || now,
               }
             };
           });
@@ -563,6 +572,52 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
           if (eventType === 'UPDATE' && newRow) {
             setAccounts(prev => prev.map(a => (a.id === newRow.id ? newRow : a)));
           }
+        } else if (table === 'family_members') {
+          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRow) {
+            const knownProfiles = getKnownProfiles();
+            const isMe = user && newRow.user_id === user.id;
+            const profile = knownProfiles[newRow.user_id];
+            const memberName = isMe
+              ? (user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me')
+              : (newRow.user?.name || profile?.name || (newRow.role === 'family_head' ? 'Family Head' : `Member (${newRow.user_id.slice(0, 6)})`));
+            const memberEmail = isMe
+              ? (user.email || '')
+              : (newRow.user?.email || profile?.email || '');
+            const avatarUrl = isMe
+              ? (user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`)
+              : (newRow.user?.avatar_url || profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${newRow.user_id}`);
+
+            const mappedMember: FamilyMember = {
+              id: newRow.id || newRow.user_id,
+              family_id: newRow.family_id,
+              user_id: newRow.user_id,
+              role: newRow.role || 'member',
+              status: (newRow.status as any) || 'active',
+              joined_at: newRow.joined_at || new Date().toISOString(),
+              created_at: newRow.created_at || new Date().toISOString(),
+              custom_permissions: newRow.custom_permissions || {},
+              user: {
+                id: newRow.user_id,
+                name: memberName,
+                email: memberEmail,
+                avatar_url: avatarUrl,
+                created_at: newRow.created_at || new Date().toISOString(),
+                updated_at: newRow.updated_at || new Date().toISOString(),
+              }
+            };
+
+            setMembers(prev => {
+              const idx = prev.findIndex(m => m.user_id === newRow.user_id || m.id === newRow.id);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = { ...copy[idx], ...mappedMember };
+                return copy;
+              }
+              return [...prev, mappedMember];
+            });
+          } else if (eventType === 'DELETE' && oldRow) {
+            setMembers(prev => prev.filter(m => m.id !== oldRow.id && m.user_id !== oldRow.user_id));
+          }
         }
       }
     );
@@ -572,26 +627,7 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
     };
   }, [family.id, isDemoMode]);
 
-  // Sync state changes to storage
-  useEffect(() => saveStorage('family', family), [family]);
-  useEffect(() => saveStorage('members', members), [members]);
-  useEffect(() => saveStorage('roles', roles), [roles]);
-  useEffect(() => saveStorage('active_member_id', currentMemberId), [currentMemberId]);
-  useEffect(() => saveStorage('accounts', accounts), [accounts]);
-  useEffect(() => saveStorage('transactions', transactions), [transactions]);
-  useEffect(() => saveStorage('budget', budget), [budget]);
-  useEffect(() => saveStorage('savings_goals', savingsGoals), [savingsGoals]);
-  useEffect(() => saveStorage('requests', requests), [requests]);
-  useEffect(() => saveStorage('recurring', recurring), [recurring]);
-  useEffect(() => saveStorage('notifications', notifications), [notifications]);
-  useEffect(() => saveStorage('audit_logs', auditLogs), [auditLogs]);
-  useEffect(() => saveStorage('loans', loans), [loans]);
-  useEffect(() => saveStorage('investments', investments), [investments]);
-  useEffect(() => saveStorage('shared_expenses', sharedExpenses), [sharedExpenses]);
-  useEffect(() => saveStorage('invitations', invitations), [invitations]);
-  useEffect(() => saveStorage('allowances', allowances), [allowances]);
-
-  // Apply theme to html element
+  // Apply theme to html element (only UI preference in localStorage)
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('ffs_theme', theme);
@@ -601,10 +637,14 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   }, []);
 
-  const currentMember = React.useMemo(() => {
-    if (!isDemoMode && user) {
-      const userRole = (memberships?.[0]?.role as SystemRoleType) || 'family_head';
+  const currentMember: FamilyMember = React.useMemo(() => {
+    if (user) {
+      const activeMem = memberships?.find(m => m.family_id === family?.id) || memberships?.[0];
+      const userRole = (activeMem?.role as SystemRoleType) || (family?.created_by === user.id || family?.owner_id === user.id ? 'family_head' : 'member');
       const now = new Date().toISOString();
+      const existingInList = members.find(m => m.user_id === user.id || m.id === currentMemberId);
+      if (existingInList) return existingInList;
+
       return {
         id: user.id,
         family_id: family?.id || 'default-family',
@@ -624,8 +664,27 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
         }
       };
     }
-    return members.find(m => m.id === currentMemberId) || activeFamilyMembers[0] || members[0] || DEMO_MEMBERS[0];
-  }, [isDemoMode, user, memberships, family?.id, members, currentMemberId, activeFamilyMembers]);
+    const found = members.find(m => m.id === currentMemberId) || activeFamilyMembers[0] || members[0];
+    if (found) return found;
+
+    return {
+      id: '',
+      family_id: family?.id || '',
+      user_id: '',
+      role: 'VIEWER' as SystemRoleType,
+      status: 'active' as const,
+      joined_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      custom_permissions: {},
+      user: {
+        id: '',
+        name: 'Guest',
+        email: '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+    };
+  }, [user, memberships, family?.id, family?.created_by, family?.owner_id, members, currentMemberId, activeFamilyMembers]);
 
   const switchMember = useCallback((memberId: string) => {
     const found = members.find(m => m.id === memberId);
@@ -692,13 +751,9 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
   // Check if member can approve an amount based on Approval Rules Engine
   const canApproveRequestAmount = useCallback((amountPaise: number): boolean => {
     if (!currentMember) return false;
-    if (currentMember.role === 'FAMILY_HEAD') return true;
-    if (currentMember.role === 'CO_MANAGER') {
-      // Co-manager can approve up to ₹2,000 (200,000 paise)
-      return amountPaise <= 200000;
-    }
-    return false;
-  }, [currentMember?.role]);
+    const isOwner = family?.created_by === currentMember.user_id || currentMember.role === 'FAMILY_HEAD';
+    return canRoleApprove(currentMember.role, amountPaise, isOwner);
+  }, [currentMember, family?.created_by]);
 
   // Action: Add Transaction
   const addTransaction = useCallback((txData: Omit<Transaction, 'id' | 'created_at' | 'updated_at' | 'family_id'> & { family_id?: string | null; visibility?: string }): Transaction => {
@@ -1109,14 +1164,12 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
         }
         return m;
       });
-      saveStorage('members', updated);
       return updated;
     });
 
     if (isNewHead && target.user_id) {
       setFamily(prev => {
         const updatedFamily = { ...prev, owner_id: target.user_id, updated_at: new Date().toISOString() };
-        saveStorage('family', updatedFamily);
         return updatedFamily;
       });
     }
@@ -1685,7 +1738,6 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
         name: trimmed,
         updated_at: new Date().toISOString(),
       };
-      saveStorage('family', updated);
       return updated;
     });
 
@@ -1703,23 +1755,9 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
     );
   }, [currentMember, family.id, family.name, logAudit, addNotification]);
 
-  // Reset to demo defaults
+  // Reset to demo defaults - No-op in production
   const resetToDemoDefaults = useCallback(() => {
-    localStorage.clear();
-    setMembers(DEMO_MEMBERS);
-    setCurrentMemberId('mem-arun');
-    setAccounts(DEMO_ACCOUNTS);
-    setTransactions(DEMO_TRANSACTIONS);
-    setBudget(DEMO_BUDGET);
-    setSavingsGoals(DEMO_SAVINGS_GOALS);
-    setRequests(DEMO_REQUESTS);
-    setRecurring(DEMO_RECURRING);
-    setNotifications(DEMO_NOTIFICATIONS);
-    setAuditLogs(DEMO_AUDIT_LOGS);
-    setLoans(DEMO_LOANS);
-    setInvestments(DEMO_INVESTMENTS);
-    setSharedExpenses(DEMO_SHARED_EXPENSES);
-    window.location.reload();
+    console.info('resetToDemoDefaults: demo data removed from production.');
   }, []);
 
   const bulkImportFamilyData = useCallback((data: {
@@ -1810,6 +1848,14 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
       });
     }
   }, [family?.id, accounts, currentMember?.user_id]);
+
+  const addImportedTransactions = useCallback((newTxs: Transaction[]) => {
+    setTransactions(prev => [...newTxs, ...prev]);
+  }, []);
+
+  const removeImportBatchTransactions = useCallback((batchId: string) => {
+    setTransactions(prev => prev.filter(t => t.import_batch_id !== batchId));
+  }, []);
 
   const createFamilyWorkspace = useCallback((familyName: string, currency: string = 'INR', timezone: string = 'Asia/Kolkata'): FamilyMember => {
     const famId = `fam-${Date.now()}`;
@@ -1918,44 +1964,13 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
     setInvestments([]);
     setSharedExpenses([]);
 
-    setIsDemoMode(false);
-    saveStorage('is_demo_mode', false);
-    saveStorage('family', newFamily);
-    saveStorage('members', [newHeadMember]);
-    saveStorage('active_member_id', memId);
-    saveStorage('accounts', initialAccounts);
-    saveStorage('transactions', initialTxs);
-
     logAudit('FAMILY_WORKSPACE_CREATED', 'family', famId, { name: nameStr });
     return newHeadMember;
   }, [logAudit]);
 
   const loadDemoFamilyWorkspace = useCallback(() => {
-    setFamily(DEMO_FAMILY);
-    setMembers(DEMO_MEMBERS);
-    setCurrentMemberId('mem-raj');
-    setIsDemoMode(true);
-    setAccounts(DEMO_ACCOUNTS);
-    setTransactions(DEMO_TRANSACTIONS);
-    setBudget(DEMO_BUDGET);
-    setSavingsGoals(DEMO_SAVINGS_GOALS);
-    setRequests(DEMO_REQUESTS);
-    setRecurring(DEMO_RECURRING);
-    setNotifications(DEMO_NOTIFICATIONS);
-    setAuditLogs(DEMO_AUDIT_LOGS);
-    setLoans(DEMO_LOANS);
-    setInvestments(DEMO_INVESTMENTS);
-    setSharedExpenses(DEMO_SHARED_EXPENSES);
-
-    saveStorage('family', DEMO_FAMILY);
-    saveStorage('members', DEMO_MEMBERS);
-    saveStorage('active_member_id', 'mem-raj');
-    saveStorage('is_demo_mode', true);
-    saveStorage('accounts', DEMO_ACCOUNTS);
-    saveStorage('transactions', DEMO_TRANSACTIONS);
-
-    logAudit('EXPLORE_DEMO_FAMILY', 'system', 'demo', { mode: 'testing' });
-  }, [logAudit]);
+    console.info('loadDemoFamilyWorkspace: demo data removed from production.');
+  }, []);
 
   const lookupInvitation = useCallback((inviteCodeOrLink: string) => {
     const cleanCode = inviteCodeOrLink.trim().toUpperCase().replace(/^.*CODE=/, '').replace(/^.*JOIN\//, '').replace(/[^A-Z0-9-]/g, '');
@@ -1978,13 +1993,13 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
     if (cleanCode.includes('ADULT')) fallbackRole = 'ADULT_MEMBER';
 
     const mockInv: FamilyInvitation = {
-      id: `inv-mock-${cleanCode}`,
+      id: `inv-${cleanCode}`,
       family_id: family.id,
       invite_code: cleanCode,
       invite_link: `${window.location.origin}/join?code=${cleanCode}`,
       invited_role: fallbackRole,
       status: 'PENDING',
-      created_by: members[0]?.user_id || 'user-arun',
+      created_by: members[0]?.user_id || user?.id || 'system',
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
@@ -1993,7 +2008,7 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
       found: true,
       invitation: mockInv,
       familyName: family.name,
-      inviterName: members[0]?.user.name || 'Arun',
+      inviterName: members[0]?.user.name || user?.user_metadata?.full_name || 'Family Head',
       assignedRole: fallbackRole,
     };
   }, [invitations, members, family.name, family.id]);
@@ -2087,9 +2102,6 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
 
     setAllFamilies(prev => [...prev.filter(f => f.id !== newFamId), newFam]);
     setFamily(newFam);
-    saveStorage('family', newFam);
-    setIsDemoMode(false);
-    saveStorage('is_demo_mode', false);
 
     // Completely clear demo seed collections for this new real family
     setTransactions(prev => prev.filter(t => t.family_id && !t.family_id.startsWith('fam-demo')));
@@ -2204,7 +2216,7 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
         id: `mem-joined-${Date.now()}`,
         family_id: target!.id,
         user_id: activeUserId,
-        user: currentMember?.user || DEMO_USERS[0],
+        user: currentMember?.user || { id: activeUserId, name: 'Member User', email: '' },
         role: 'ADULT_MEMBER',
         status: 'active',
         joined_at: new Date().toISOString(),
@@ -2251,7 +2263,7 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
         activeFamily,
         linkedFamilies,
         activeUserId,
-        demoUsers: DEMO_USERS,
+        demoUsers: [],
         switchDemoUser,
         switchActiveFamily,
         createFamily,
@@ -2332,6 +2344,8 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
         updateFamilyName,
         resetToDemoDefaults,
         bulkImportFamilyData,
+        addImportedTransactions,
+        removeImportBatchTransactions,
         createFamilyWorkspace,
         lookupInvitation,
         acceptInvitation,

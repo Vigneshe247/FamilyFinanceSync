@@ -6,15 +6,22 @@
 
 import { createClient, User as SupabaseUser, Session } from '@supabase/supabase-js';
 
+const metaEnv: Record<string, any> =
+  typeof import.meta !== 'undefined' && (import.meta as any).env
+    ? (import.meta as any).env
+    : typeof process !== 'undefined' && process.env
+    ? process.env
+    : {};
+
 const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_URL ||
+  metaEnv.VITE_SUPABASE_URL ||
+  metaEnv.NEXT_PUBLIC_SUPABASE_URL ||
   'https://fwhyqhgilvbdxppiiirr.supabase.co';
 
 const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  metaEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  metaEnv.VITE_SUPABASE_ANON_KEY ||
+  metaEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   'sb_publishable_Uaq6TUPUXJiyTwwvhIvNkw__jFzIsc3';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -81,14 +88,18 @@ export const supabaseAuthService = {
    */
   async ensureUserFamilyWorkspace(user: SupabaseUser, fullName: string, phone?: string) {
     try {
-      // 1. Upsert profile
-      await supabase.from('profiles').upsert({
-        id: user.id,
-        full_name: fullName || user.email?.split('@')[0] || 'Family Head',
-        email: user.email,
-        phone: phone || '',
-        updated_at: new Date().toISOString(),
-      });
+      // 1. Try upserting profile if table exists
+      try {
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          full_name: fullName || user.email?.split('@')[0] || 'Family Head',
+          email: user.email,
+          phone: phone || '',
+          updated_at: new Date().toISOString(),
+        });
+      } catch (profileErr) {
+        // Ignored if profiles table not present
+      }
 
       // 2. Check if user already belongs to a family
       const { data: existingMembership } = await supabase
@@ -100,15 +111,21 @@ export const supabaseAuthService = {
       if (!existingMembership || existingMembership.length === 0) {
         // 3. Create default family
         const familyName = fullName ? `${fullName}'s Family` : 'My Family Workspace';
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let codeSuffix = '';
+        for (let i = 0; i < 6; i++) {
+          codeSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const famCode = `FAM-${codeSuffix}`;
+
         const { data: newFamily, error: familyErr } = await supabase
           .from('families')
           .insert({
             name: familyName,
-            owner_id: user.id,
-            currency: 'INR',
-            timezone: 'Asia/Kolkata',
+            created_by: user.id,
+            family_code: famCode,
           })
-          .select()
+          .select('id, name, family_code, created_by, created_at')
           .single();
 
         if (familyErr) {
@@ -121,31 +138,31 @@ export const supabaseAuthService = {
           await supabase.from('family_members').insert({
             family_id: newFamily.id,
             user_id: user.id,
-            role_id: 'FAMILY_HEAD',
+            role: 'family_head',
             status: 'active',
-            monthly_allowance: 0,
-            monthly_spending_limit: 0,
           });
 
           // 5. Create default starter accounts
-          await supabase.from('accounts').insert([
-            {
-              family_id: newFamily.id,
-              name: 'Main Bank Account',
-              type: 'bank',
-              balance: 5000000, // ₹50,000 in paise
-              currency: 'INR',
-              is_shared: true,
-            },
-            {
-              family_id: newFamily.id,
-              name: 'Cash In Hand',
-              type: 'cash',
-              balance: 1000000, // ₹10,000 in paise
-              currency: 'INR',
-              is_shared: true,
-            },
-          ]);
+          try {
+            await supabase.from('accounts').insert([
+              {
+                family_id: newFamily.id,
+                name: 'Main Bank Account',
+                type: 'bank',
+                balance: 5000000, // ₹50,000 in paise
+                currency: 'INR',
+                is_shared: true,
+              },
+              {
+                family_id: newFamily.id,
+                name: 'Cash In Hand',
+                type: 'cash',
+                balance: 1000000, // ₹10,000 in paise
+                currency: 'INR',
+                is_shared: true,
+              },
+            ]);
+          } catch (accErr) {}
 
           // 6. Create default starter categories
           await supabase.from('categories').insert([

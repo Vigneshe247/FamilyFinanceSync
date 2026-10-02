@@ -8,6 +8,7 @@
    ========================================================= */
 
 import { supabase } from './supabase';
+import { saveKnownProfile, updateFamilyMemberRole } from './familyService';
 import {
   Family,
   FamilyMember,
@@ -45,8 +46,8 @@ export const supabaseDataService = {
         requestsRes,
         auditLogsRes,
       ] = await Promise.all([
-        supabase.from('families').select('*').eq('id', familyId).single(),
-        supabase.from('family_members').select('*, profiles(*)').eq('family_id', familyId),
+        supabase.from('families').select('*').eq('id', familyId).maybeSingle(),
+        supabase.from('family_members').select('id, family_id, user_id, role, status, joined_at, created_at, updated_at').eq('family_id', familyId),
         supabase.from('accounts').select('*').eq('family_id', familyId),
         supabase.from('categories').select('*').eq('family_id', familyId),
         supabase
@@ -61,9 +62,55 @@ export const supabaseDataService = {
         supabase.from('audit_logs').select('*').eq('family_id', familyId).order('created_at', { ascending: false }).limit(50),
       ]);
 
+      const rawMembers = membersRes.data || [];
+      const userIds = rawMembers.map((m: any) => m.user_id).filter(Boolean);
+
+      let profilesMap: Record<string, any> = {};
+      if (userIds.length > 0) {
+        try {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, phone, avatar_url, updated_at')
+            .in('id', userIds);
+
+          if (profs && profs.length > 0) {
+            profs.forEach((p: any) => {
+              profilesMap[p.id] = p;
+              saveKnownProfile(p.id, {
+                id: p.id,
+                name: p.full_name || p.email?.split('@')[0] || 'Family Member',
+                email: p.email || '',
+                avatar_url: p.avatar_url,
+              });
+            });
+          }
+        } catch (pErr) {
+          console.warn('Supabase profiles query notice:', pErr);
+        }
+      }
+
+      const enrichedMembers = rawMembers.map((m: any) => {
+        const prof = profilesMap[m.user_id];
+        const memberName = prof?.full_name || (m.role === 'family_head' ? 'Family Head' : 'Family Member');
+        const memberEmail = prof?.email || '';
+        const avatarUrl = prof?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.user_id}`;
+
+        return {
+          ...m,
+          user: {
+            id: m.user_id,
+            name: memberName,
+            email: memberEmail,
+            avatar_url: avatarUrl,
+            created_at: m.created_at || new Date().toISOString(),
+            updated_at: m.updated_at || new Date().toISOString(),
+          }
+        };
+      });
+
       return {
-        family: familyRes.data,
-        members: membersRes.data,
+        family: familyRes.data || null,
+        members: enrichedMembers,
         accounts: accountsRes.data || [],
         categories: categoriesRes.data || [],
         transactions: transactionsRes.data || [],
@@ -124,6 +171,30 @@ export const supabaseDataService = {
         { event: '*', schema: 'public', table: 'savings_goals', filter: `family_id=eq.${familyId}` },
         payload => {
           onEvent('savings_goals', payload.eventType as any, payload.new, payload.old);
+        }
+      )
+      // 6. Family Members stream (instant real-time display when a new member joins)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'family_members', filter: `family_id=eq.${familyId}` },
+        payload => {
+          onEvent('family_members', payload.eventType as any, payload.new, payload.old);
+        }
+      )
+      // 7. Real-time broadcast for instant inter-client member sync
+      .on(
+        'broadcast',
+        { event: 'member_joined' },
+        payload => {
+          onEvent('family_members', 'INSERT', payload.payload, null);
+        }
+      )
+      // 8. Real-time broadcast for instant member role update across browsers
+      .on(
+        'broadcast',
+        { event: 'member_updated' },
+        payload => {
+          onEvent('family_members', 'UPDATE', payload.payload, null);
         }
       )
       .subscribe((status, err) => {
@@ -225,7 +296,7 @@ export const supabaseDataService = {
    */
   async adjustAccountBalance(accountId: string, deltaPaise: number) {
     try {
-      const { data: acc } = await supabase.from('accounts').select('balance').eq('id', accountId).single();
+      const { data: acc } = await supabase.from('accounts').select('balance').eq('id', accountId).maybeSingle();
       if (acc) {
         const newBalance = (acc.balance || 0) + deltaPaise;
         await supabase.from('accounts').update({ balance: newBalance }).eq('id', accountId);
@@ -236,7 +307,7 @@ export const supabaseDataService = {
   },
 
   /**
-   * Submit an expense request (Arun -> Raj approval workflow)
+   * Submit an expense request (Member -> Family Head / Co-Manager approval workflow)
    */
   async createExpenseRequest(req: {
     family_id: string;
@@ -367,4 +438,12 @@ export const supabaseDataService = {
       return { success: false, error: err.message };
     }
   },
+
+  /**
+   * Update a family member's role (Family Head governance)
+   */
+  async updateMemberRole(familyId: string, memberId: string, newRole: string) {
+    return updateFamilyMemberRole(familyId, memberId, newRole);
+  },
 };
+

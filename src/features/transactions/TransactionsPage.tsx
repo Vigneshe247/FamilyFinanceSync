@@ -20,6 +20,8 @@ import {
   Calendar,
   Settings,
   Receipt,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { AccountTransferModal } from '../../components/modals/AccountTransferModal';
 import { TransactionDetailsModal } from '../../components/modals/TransactionDetailsModal';
@@ -46,6 +48,9 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({ onOpenNewTx 
     members,
     accounts,
     currentMember,
+    workspaceLoading,
+    workspaceError,
+    retryLoadWorkspace,
   } = useFamilyFinance();
 
   const [viewScope, setViewScope] = useState<'all' | 'family' | 'private' | 'my_tx'>('all');
@@ -150,6 +155,56 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({ onOpenNewTx 
 
   return (
     <div className="content-page">
+      {workspaceError && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            padding: '1rem 1.25rem',
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            borderRadius: '12px',
+            marginBottom: '1.25rem',
+            color: '#DC2626',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AlertTriangle size={20} style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Workspace Data Sync Failed</div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                {workspaceError}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => retryLoadWorkspace()}
+            disabled={workspaceLoading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.45rem 0.9rem',
+              background: '#DC2626',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              cursor: workspaceLoading ? 'not-allowed' : 'pointer',
+              opacity: workspaceLoading ? 0.6 : 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <RefreshCw size={14} className={workspaceLoading ? 'animate-spin' : ''} />
+            {workspaceLoading ? 'Retrying...' : 'Retry'}
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div
         style={{
@@ -391,9 +446,44 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({ onOpenNewTx 
               </tr>
             </thead>
             <tbody>
-              {sortedTransactions.length === 0 ? (
+              {workspaceLoading && transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={hasPermission('transactions.delete') ? 9 : 8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                    <div style={{ maxWidth: '440px', margin: '0 auto' }}>
+                      <RefreshCw size={32} className="animate-spin" style={{ color: 'var(--mint-primary)', margin: '0 auto 0.75rem', display: 'block' }} />
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                        Syncing Family Ledger...
+                      </div>
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        Fetching transactions securely from Supabase
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : workspaceError && transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={hasPermission('transactions.delete') ? 9 : 8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                    <div style={{ maxWidth: '440px', margin: '0 auto' }}>
+                      <AlertTriangle size={32} style={{ color: '#DC2626', margin: '0 auto 0.75rem', display: 'block' }} />
+                      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#DC2626', marginBottom: '0.35rem' }}>
+                        Unable to Load Ledger
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+                        {workspaceError}
+                      </p>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => retryLoadWorkspace()}
+                        disabled={workspaceLoading}
+                      >
+                        <RefreshCw size={14} className={workspaceLoading ? 'animate-spin' : ''} /> Retry Sync
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : sortedTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={hasPermission('transactions.delete') ? 9 : 8} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
                     {transactions.length === 0 ? (
                       <div style={{ maxWidth: '440px', margin: '0 auto' }}>
                         <Receipt size={36} style={{ color: 'var(--brass)', opacity: 0.7, margin: '0 auto 0.75rem', display: 'block' }} />

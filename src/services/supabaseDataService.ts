@@ -62,18 +62,39 @@ export const supabaseDataService = {
         supabase.from('audit_logs').select('*').eq('family_id', familyId).order('created_at', { ascending: false }).limit(50),
       ]);
 
+      // Check for errors across all workspace queries
+      const queryErrors = [
+        familyRes.error && `family (${familyRes.error.message})`,
+        membersRes.error && `members (${membersRes.error.message})`,
+        accountsRes.error && `accounts (${accountsRes.error.message})`,
+        categoriesRes.error && `categories (${categoriesRes.error.message})`,
+        transactionsRes.error && `transactions (${transactionsRes.error.message})`,
+        budgetsRes.error && `budgets (${budgetsRes.error.message})`,
+        goalsRes.error && `goals (${goalsRes.error.message})`,
+        requestsRes.error && `requests (${requestsRes.error.message})`,
+        auditLogsRes.error && `audit logs (${auditLogsRes.error.message})`,
+      ].filter(Boolean);
+
+      if (queryErrors.length > 0) {
+        const errorSummary = `Failed to query ${queryErrors.join(', ')}`;
+        console.error('[supabaseDataService] Query failure in fetchFamilyWorkspace:', errorSummary);
+        throw new Error(errorSummary);
+      }
+
       const rawMembers = membersRes.data || [];
       const userIds = rawMembers.map((m: any) => m.user_id).filter(Boolean);
 
       let profilesMap: Record<string, any> = {};
       if (userIds.length > 0) {
         try {
-          const { data: profs } = await supabase
+          const { data: profs, error: profsErr } = await supabase
             .from('profiles')
             .select('id, full_name, email, phone, avatar_url, updated_at')
             .in('id', userIds);
 
-          if (profs && profs.length > 0) {
+          if (profsErr) {
+            console.warn('[supabaseDataService] Profile query notice:', profsErr.message);
+          } else if (profs && profs.length > 0) {
             profs.forEach((p: any) => {
               profilesMap[p.id] = p;
               saveKnownProfile(p.id, {
@@ -119,9 +140,10 @@ export const supabaseDataService = {
         requests: requestsRes.data || [],
         auditLogs: auditLogsRes.data || [],
       };
-    } catch (err) {
-      console.warn('Supabase fetchFamilyWorkspace fallback:', err);
-      return null;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Database sync failed';
+      console.error('[supabaseDataService] fetchFamilyWorkspace failure:', message);
+      throw err;
     }
   },
 

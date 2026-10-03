@@ -1,6 +1,9 @@
 -- =========================================================
--- FAMILY FINANCE SYNC — POSTGRESQL PRODUCTION DDL MIGRATION
--- Multi-Tenant, Role-Based Access Control, Integer Paise Math
+-- [DEPRECATED - DO NOT APPLY TO SUPABASE]
+-- MIGRATION 001: Initial Prototype Schema (Obsolete)
+-- REASON: Defines a custom standalone 'users' table which is
+-- incompatible with Supabase Auth ('auth.users' + 'public.profiles').
+-- Use 000_production_schema.sql as the base schema instead.
 -- =========================================================
 
 -- Enable UUID extension

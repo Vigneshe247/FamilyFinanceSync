@@ -17,6 +17,7 @@ import {
   generateTransactionFingerprint,
   autoDetectColumnMapping,
   normalizeAndValidateRecords,
+  parseUploadedFile,
   RawParsedRow,
 } from '../services/importEngine';
 import * as XLSX from 'xlsx';
@@ -179,5 +180,52 @@ export function runComprehensiveTestSuite(): TestResult[] {
     if (jsonRows[0]['Description'] !== 'Internet Fiber Bill') throw new Error('Row 1 description mismatch');
   });
 
+  // 8. MULTI-SECTION SPREADSHEET (INCOME & EXPENSES) PARSING VERIFICATION
+  runTest('Multi-Section Spreadsheet Parsing with Income & Expense Blocks and Summary Rows', 'import', async () => {
+    const multiTableData = [
+      ['Date', 'Income Source', 'Category', 'Amount (INR)'],
+      ['01-Oct-2026', 'Primary Salary', 'Salary', '75000'],
+      ['02-Oct-2026', 'Spouse Salary', 'Salary', '18000'],
+      ['Total Income', '', '', '93000'], // Summary row to be skipped
+      [], // blank row
+      ['Date', 'Description / Payee', 'Category', 'Type', 'Amount (INR)'],
+      ['02-Oct-2026', 'House Rent', 'Housing', 'Fixed', '20000'],
+      ['03-Oct-2026', 'Supermarket Groceries', 'Food & Groceries', 'Variable', '12000'],
+      ['Total Expenses', '', '', '', '32000'], // Summary row to be skipped
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(multiTableData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Budget');
+    const u8 = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const file = new File([u8], 'family_budget_test.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    const parseRes = await parseUploadedFile(file);
+    if (parseRes.rows.length !== 4) {
+      throw new Error(`Expected exactly 4 transaction rows (excluding headers & totals), got ${parseRes.rows.length}`);
+    }
+
+    const summary = normalizeAndValidateRecords(parseRes.rows, parseRes.detectedMapping, 'fam-test', new Set());
+    if (summary.validRecords !== 4) {
+      throw new Error(`Expected 4 valid records, got ${summary.validRecords}`);
+    }
+    if (summary.invalidRecords !== 0) {
+      throw new Error(`Expected 0 invalid records, got ${summary.invalidRecords}`);
+    }
+
+    // Verify row 1 is income with correct amount
+    const r1 = summary.transactions[0];
+    if (r1.description !== 'Primary Salary' || r1.type !== 'income' || r1.amountPaise !== 7500000) {
+      throw new Error(`Row 1 mismatch: ${r1.description} | ${r1.type} | ${r1.amountPaise}`);
+    }
+
+    // Verify row 3 is expense with correct amount
+    const r3 = summary.transactions[2];
+    if (r3.description !== 'House Rent' || r3.type !== 'expense' || r3.amountPaise !== 2000000) {
+      throw new Error(`Row 3 mismatch: ${r3.description} | ${r3.type} | ${r3.amountPaise}`);
+    }
+  });
+
   return results;
 }
+

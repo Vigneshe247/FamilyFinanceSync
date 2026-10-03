@@ -165,6 +165,9 @@ interface FamilyFinanceContextType {
   acceptInvitation: (inviteCodeOrLink: string, userName: string, userEmail: string) => FamilyMember;
   loadDemoFamilyWorkspace: () => void;
   isDemoMode: boolean;
+  workspaceLoading: boolean;
+  workspaceError: string | null;
+  retryLoadWorkspace: () => Promise<void>;
 }
 
 const FamilyFinanceContext = createContext<FamilyFinanceContextType | undefined>(undefined);
@@ -214,6 +217,8 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [currentMemberId, setCurrentMemberId] = useState<string>('');
   const [isDemoMode] = useState<boolean>(false);
+  const [workspaceLoading, setWorkspaceLoading] = useState<boolean>(false);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
 
   const checkReadOnly = useCallback((): boolean => {
     return false;
@@ -487,12 +492,13 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
     return calculateFamilySummary(familyTransactions, activeAccountsList);
   }, [familyTransactions, activeAccountsList]);
 
-  // Supabase Real-Time Channel Subscription (Sections 8, 10, 36)
-  useEffect(() => {
-    if (!family.id || isDemoMode || family.id === 'fam-demo-001') return;
-
-    // 1. Initial fetch from Supabase
-    supabaseDataService.fetchFamilyWorkspace(family.id).then(data => {
+  // Explicit workspace data loader with real error surfacing and loading state
+  const loadWorkspaceData = useCallback(async (familyId: string) => {
+    if (!familyId || isDemoMode || familyId === 'fam-demo-001') return;
+    setWorkspaceLoading(true);
+    setWorkspaceError(null);
+    try {
+      const data = await supabaseDataService.fetchFamilyWorkspace(familyId);
       if (data) {
         if (data.members && data.members.length > 0) {
           const knownProfiles = getKnownProfiles();
@@ -531,20 +537,46 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
           });
           setMembers(fetchedMembers);
         }
-        if (data.transactions && data.transactions.length > 0) {
+        if (Array.isArray(data.transactions)) {
           setTransactions(data.transactions);
         }
-        if (data.accounts && data.accounts.length > 0) {
+        if (Array.isArray(data.accounts)) {
           setAccounts(data.accounts);
         }
-        if (data.requests && data.requests.length > 0) {
+        if (Array.isArray(data.requests)) {
           setRequests(data.requests);
         }
-        if (data.auditLogs && data.auditLogs.length > 0) {
+        if (Array.isArray(data.auditLogs)) {
           setAuditLogs(data.auditLogs);
         }
+        if (Array.isArray(data.categories) && data.categories.length > 0) {
+          setCategories(data.categories);
+        }
+        if (Array.isArray(data.goals)) {
+          setSavingsGoals(data.goals);
+        }
       }
-    });
+      setWorkspaceLoading(false);
+      setWorkspaceError(null);
+    } catch (err: unknown) {
+      setWorkspaceLoading(false);
+      const msg = err instanceof Error ? err.message : 'Database query failure';
+      setWorkspaceError(msg);
+    }
+  }, [user, isDemoMode]);
+
+  const retryLoadWorkspace = useCallback(async () => {
+    if (family.id) {
+      await loadWorkspaceData(family.id);
+    }
+  }, [family.id, loadWorkspaceData]);
+
+  // Supabase Real-Time Channel Subscription (Sections 8, 10, 36)
+  useEffect(() => {
+    if (!family.id || isDemoMode || family.id === 'fam-demo-001') return;
+
+    // 1. Initial fetch from Supabase
+    loadWorkspaceData(family.id);
 
     // 2. Realtime listener on channel family:{familyId}
     const unsubscribe = supabaseDataService.subscribeToFamilyRealtime(
@@ -2351,6 +2383,9 @@ export const FamilyFinanceProvider: React.FC<{ children: ReactNode }> = ({ child
         acceptInvitation,
         loadDemoFamilyWorkspace,
         isDemoMode,
+        workspaceLoading,
+        workspaceError,
+        retryLoadWorkspace,
       }}
     >
       {children}

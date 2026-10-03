@@ -38,6 +38,8 @@ import {
   Receipt,
   UserPlus,
   Sparkles,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { useViewSettings } from '../../context/ViewSettingsContext';
 import { PrivateFinancesView } from './components/PrivateFinancesView';
@@ -70,6 +72,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     requests,
     auditLogs,
     createGoal,
+    workspaceLoading,
+    workspaceError,
+    retryLoadWorkspace,
   } = useFamilyFinance();
 
   const [dashboardScope, setDashboardScope] = useState<'family' | 'private'>('family');
@@ -256,6 +261,56 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   return (
     <div className="neo-page-body">
+      {workspaceError && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            padding: '1rem 1.25rem',
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            borderRadius: '16px',
+            marginBottom: '1.25rem',
+            color: '#DC2626',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AlertTriangle size={20} style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Workspace Data Sync Failed</div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                {workspaceError}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => retryLoadWorkspace()}
+            disabled={workspaceLoading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.5rem 1rem',
+              background: '#DC2626',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              cursor: workspaceLoading ? 'not-allowed' : 'pointer',
+              opacity: workspaceLoading ? 0.6 : 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <RefreshCw size={14} className={workspaceLoading ? 'animate-spin' : ''} />
+            {workspaceLoading ? 'Retrying...' : 'Retry'}
+          </button>
+        </div>
+      )}
+
       {/* ================= CHILD MODE: CREXTIO DESIGN ================= */}
       {isChild ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

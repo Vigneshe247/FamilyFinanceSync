@@ -103,22 +103,47 @@ Fam - finance/
 ## Running Locally
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 npm install
 
-# Start development server
-npm run dev
+# 2. Configure environment
+cp .env.example .env
+# Fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
-# Run production build
-npm run build
+# 3. Start local development server
+npm run dev
 ```
 
 ---
 
-## Connecting the Database Later
+## Production Setup & Deployment Checklist
 
-When you are ready to integrate Supabase or PostgreSQL:
-1. Run the migration script in `database/migrations/001_initial_schema.sql` against your PostgreSQL or Supabase instance.
-2. Seed system roles using `database/seeds/001_demo_family_seed.sql`.
-3. Set your credentials in `.env` based on `.env.example`.
-4. Point the API client in `src/services/api.ts` to your Netlify Functions or Supabase endpoints.
+### 1. Database Provisioning & Migrations
+1. Canonical migrations are maintained in `supabase/migrations/` and documented in `database/README.md`.
+2. For local Supabase CLI development:
+   ```bash
+   npx supabase start
+   npx supabase db reset
+   ```
+3. For remote staging/production:
+   ```bash
+   npx supabase db push
+   ```
+   *Never execute legacy migrations `001` or `002`.*
+
+### 2. Transactional Email Edge Function
+Email invitations and notifications are executed via a secure Supabase Edge Function:
+1. Deploy the `send-email` edge function:
+   ```bash
+   npx supabase functions deploy send-email
+   ```
+2. Set the Resend server secrets in Supabase (never expose in client code):
+   ```bash
+   npx supabase secrets set RESEND_API_KEY="re_your_api_key_here" RESEND_FROM_EMAIL="FamilyFinanceSync <notifications@yourdomain.com>"
+   ```
+
+### 3. Supabase Auth & Realtime Configuration
+1. **Email Confirmation**: In the Supabase Dashboard under **Authentication → Email Templates**, verify your site URL and confirmation redirect paths (`https://your-domain.com/verify-email`).
+2. **Realtime Channels**: Under **Database → Publications**, ensure private user channels are enabled (`user:{uid}`) and the following tables are published to `supabase_realtime`: `transactions`, `accounts`, `requests`, `family_join_requests`, and `notifications`.
+3. **Storage Buckets**: Run migration `007` (or `supabase db push`) to provision the `receipts` and `exports` private storage buckets with strict RLS policies.
+

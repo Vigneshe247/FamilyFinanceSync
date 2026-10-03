@@ -81,11 +81,27 @@ export class SupabaseFinanceRepository implements FinanceRepository {
         this.db.rpc('my_permissions', { p_family_id: familyId }),
       ]);
 
+      // Check every query's error field so failures do not silently become empty arrays or 0 balances
+      if (family.error) throw toRepositoryError(family.error);
+      if (members.error) throw toRepositoryError(members.error);
+      if (roles.error) throw toRepositoryError(roles.error);
+      if (rolePerms.error) throw toRepositoryError(rolePerms.error);
+      if (familyRolePerms.error) throw toRepositoryError(familyRolePerms.error);
+      if (memberPerms.error) throw toRepositoryError(memberPerms.error);
+      if (categories.error) throw toRepositoryError(categories.error);
+      if (accounts.error) throw toRepositoryError(accounts.error);
+      if (txs.error) throw toRepositoryError(txs.error);
+      if (requests.error) throw toRepositoryError(requests.error);
+      if (notifications.error) throw toRepositoryError(notifications.error);
+      if (myPerms.error) throw toRepositoryError(myPerms.error);
+
       const memberRows = (members.data ?? []) as Row[];
       const userIds = memberRows.map(m => String(m.user_id));
       const profiles = userIds.length
         ? await this.db.from('profiles').select('*').in('id', userIds)
         : { data: [] as Row[], error: null };
+
+      if (profiles.error) throw toRepositoryError(profiles.error);
 
       const profileById = new Map(((profiles.data ?? []) as Row[]).map(p => [String(p.id), p]));
       this.names = new Map(

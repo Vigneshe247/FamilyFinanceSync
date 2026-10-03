@@ -1,6 +1,8 @@
 -- =========================================================
--- FAMILY FINANCE SYNC — PROFILES & SUPABASE AUTH TRIGGER (Step 10 - 12)
--- Architecture: auth.users (1:1) -> profiles -> family_members -> families
+-- [DEPRECATED - DO NOT APPLY TO SUPABASE]
+-- MIGRATION 002: Profiles & Firebase Auth Trigger (Obsolete)
+-- REASON: References 'firebase_uid' which does not exist in the
+-- Supabase architecture, and trigger is superseded by 003 and 012.
 -- =========================================================
 
 -- 1. CREATE PROFILES TABLE (Separation from auth.users, Step 10 & 11)

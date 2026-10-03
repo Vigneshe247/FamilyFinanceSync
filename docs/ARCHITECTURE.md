@@ -64,16 +64,22 @@ Frontend checks shape the UI only. **The database enforces every rule.**
 
 ## 4. Database architecture
 
-Apply on Supabase in this order: `000_production_schema.sql`, then `003_authorization_privacy_ledger.sql` (idempotent). `001` is a legacy non-Supabase schema and `002` does not apply after `000`; see `database/README.md`.
+Database migrations are maintained in `supabase/migrations/` (timestamped for Supabase CLI) and `database/migrations/` (repository history).
 
-Key tables: `families`, `family_members` (role, relationship, `share_income`, `share_expenses`, `sharing_locked`, soft-removal), `roles`, `role_permissions`, `family_role_permissions`, `member_permissions`, `transactions` (ledger; `visibility`, `version`, `idempotency_key`, soft void), `accounts` (`opening_balance`, trigger-maintained `balance`), `requests` (typed), `notifications`, `audit_logs`, `family_invitations`.
+* **Canonical sequence**: Execute migrations 000, 003, 004, 005, 006, 007, 008, 009, 010, 011, 012, 013, 014, 015, 016, and 017. See `database/README.md` for the comprehensive sequence table and execution instructions.
+* **Excluded / Deprecated**: `001_initial_schema.sql` (legacy standalone users table) and `002_profiles_and_auth_trigger.sql` (obsolete Firebase trigger). Do NOT run these.
+* **Required Extensions**: `"uuid-ossp"` and `"pgcrypto"`.
+
+Key tables: `profiles` (1:1 with `auth.users`), `families` (with unique `family_code`), `family_members` (role, relationship, `share_income`, `share_expenses`, `sharing_locked`, soft-removal), `roles`, `role_permissions`, `family_role_permissions`, `member_permissions`, `transactions` (ledger; `visibility`, `version`, `idempotency_key`, soft void), `accounts` (`opening_balance`, trigger-maintained `balance`), `requests` (typed), `family_join_requests` (join workflow), `import_batches` (bank statement import audit), `notifications`, `audit_logs`, `family_invitations`.
 
 Money is `BIGINT` paise everywhere (`amount > 0` enforced). The UI parses rupees with `parseRupeesToPaise` (string arithmetic, no floats).
 
-## 5. Security model
+## 5. Security & Isolation model
 
 * Clients have **SELECT only** on app tables, filtered by RLS. The exceptions are column-limited: own profile fields, `notifications.read_at`, and manager-only writes to budgets/goals/categories/non-balance account fields.
-* Every sensitive write is a `SECURITY DEFINER` RPC with `search_path = ''` that re-checks membership and permission, validates input and writes atomically: `create_transaction`, `update_transaction`, `void_transaction`, `create_request`, `review_request`, `cancel_request`, `set_member_sharing`, `set_member_permission`, `assign_member_role`, `remove_member`, `create_invitation`, `accept_invitation`, `revoke_invitation`, `create_role`, `set_role_permissions`, `delete_role`, `update_family`, `bootstrap_family`, `reconcile_account_balance`.
+* Every sensitive write is an atomic `SECURITY DEFINER` RPC with fixed `search_path = public` (or `search_path = ''`) that re-checks membership and permission, validates input, and mutates atomically: `create_family` (atomic workspace provisioning), `create_transaction`, `update_transaction`, `void_transaction`, `create_request`, `review_request`, `cancel_request`, `set_member_sharing`, `set_member_permission`, `assign_member_role`, `remove_member`, `create_invitation`, `accept_invitation`, `revoke_invitation`, `create_role`, `set_role_permissions`, `delete_role`, `update_family`, `bootstrap_family`, `reconcile_account_balance`.
+* **Atomic Workspace Provisioning**: Creating a new family workspace is encapsulated inside `public.create_family(p_name, p_description, p_family_code)`. It verifies caller `auth.uid()`, provisions a profile if missing, creates the family, assigns the caller as `family_head`, provisions default categories and a 0-balance starter account, and writes an audit log in a single transaction.
+* **Server-Side Email Boundary**: Browser code never handles Resend API credentials. Transactional emails and invites are dispatched via the `send-email` Supabase Edge Function (`supabase/functions/send-email/index.ts`), which validates caller JWTs, escapes HTML inputs, and accesses `RESEND_API_KEY` exclusively from server environment secrets.
 * **Financial privacy**: a transaction is visible to another member only if the viewer has `transactions.view_family`, the row's `visibility = 'family'`, and the owner shares that type (`share_income` / `share_expenses`). Membership alone grants nothing.
 * Guard rails: nobody reviews their own request, changes their own permissions/role permissions, grants a permission they lack, removes or re-roles the owner, or assigns Family Head unless they are the owner.
 * Removal is soft: access ends immediately, history stays.

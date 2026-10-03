@@ -30,7 +30,7 @@ export interface CreateFamilyResult {
   family_id?: string;
   name?: string;
   invite_code?: string;
-  role?: 'family_head';
+  role?: FamilyRole;
   error?: string;
 }
 
@@ -38,7 +38,7 @@ export interface JoinFamilyResult {
   success: boolean;
   family_id?: string;
   name?: string;
-  role?: 'member';
+  role?: FamilyRole;
   error?: string;
 }
 
@@ -238,7 +238,7 @@ export async function createFamilyWithOwner(name: string, description?: string, 
     };
   }
 
-  // 1. Try atomic Supabase RPC create_family
+  // 1. Authenticated atomic server-side RPC
   try {
     const { data, error } = await supabase.rpc('create_family', {
       p_name: cleanName,
@@ -247,122 +247,59 @@ export async function createFamilyWithOwner(name: string, description?: string, 
     });
 
     if (error) {
-      console.warn('Create family RPC notice:', error.message);
-    } else if (data) {
-      const newMem: UserFamilyMembership = {
-        id: data.member_id || crypto.randomUUID(),
-        family_id: data.family_id,
-        family_name: data.name || cleanName,
-        description: description?.trim() || '',
-        user_id: userId,
-        role: 'family_head',
-        role_display: getRoleLabel('family_head'),
-        status: 'active',
-        invite_code: data.family_code || data.invite_code || familyCode,
-        joined_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      };
-      const existing = getLocalUserMemberships(userId);
-      saveLocalUserMemberships(userId, [...existing.filter(m => m.family_id !== data.family_id), newMem]);
-
+      console.error('[familyService] create_family RPC failed:', error.message);
       return {
-        success: true,
-        family_id: data.family_id,
-        name: data.name || cleanName,
-        invite_code: data.family_code || data.invite_code || familyCode,
-        role: 'family_head',
+        success: false,
+        error: error.message || 'Failed to create family workspace on server.',
       };
     }
-  } catch (rpcErr) {
-    console.warn('RPC create_family notice:', rpcErr);
-  }
 
-  // 2. Direct table insertion
-  try {
-    const { data: fam, error: famErr } = await supabase
-      .from('families')
-      .insert({
-        name: cleanName,
-        description: description?.trim() || '',
-        created_by: userId,
-        family_code: familyCode,
-      })
-      .select('id, name, description, family_code, created_by, created_at')
-      .single();
-
-    if (!famErr && fam) {
-      const { data: memberData } = await supabase.from('family_members').insert({
-        family_id: fam.id,
-        user_id: userId,
-        role: 'family_head',
-        status: 'active',
-      }).select('id, family_id, user_id, role, status, joined_at, created_at').single();
-
-      // Cache creator profile
-      saveKnownProfile(userId, {
-        id: userId,
-        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Family Head',
-        email: user?.email || '',
-        avatar_url: user?.user_metadata?.avatar_url,
-      });
-
-      const newMem: UserFamilyMembership = {
-        id: memberData?.id || crypto.randomUUID(),
-        family_id: fam.id,
-        family_name: fam.name,
-        description: description?.trim() || '',
-        user_id: userId,
-        role: 'family_head',
-        role_display: getRoleLabel('family_head'),
-        status: 'active',
-        invite_code: familyCode,
-        joined_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      };
-      const existing = getLocalUserMemberships(userId);
-      saveLocalUserMemberships(userId, [...existing.filter(m => m.family_id !== fam.id), newMem]);
-
+    if (!data || !data.family_id) {
       return {
-        success: true,
-        family_id: fam.id,
-        name: fam.name,
-        invite_code: familyCode,
-        role: 'family_head',
+        success: false,
+        error: 'Server returned incomplete workspace provisioning data.',
       };
     }
 
-    if (famErr) {
-      console.warn('Supabase families table notice:', famErr.message);
-    }
-  } catch (fallbackErr: any) {
-    console.warn('Supabase create family fallback notice:', fallbackErr?.message);
+    const newMem: UserFamilyMembership = {
+      id: data.member_id || crypto.randomUUID(),
+      family_id: data.family_id,
+      family_name: data.name || cleanName,
+      description: description?.trim() || '',
+      user_id: userId,
+      role: 'family_head',
+      role_display: getRoleLabel('family_head'),
+      status: 'active',
+      invite_code: data.family_code || data.invite_code || familyCode,
+      joined_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    };
+    const existing = getLocalUserMemberships(userId);
+    saveLocalUserMemberships(userId, [...existing.filter(m => m.family_id !== data.family_id), newMem]);
+
+    // Cache creator profile
+    saveKnownProfile(userId, {
+      id: userId,
+      name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Family Head',
+      email: user?.email || '',
+      avatar_url: user?.user_metadata?.avatar_url,
+    });
+
+    return {
+      success: true,
+      family_id: data.family_id,
+      name: data.name || cleanName,
+      invite_code: data.family_code || data.invite_code || familyCode,
+      role: 'family_head',
+    };
+  } catch (rpcErr: unknown) {
+    const message = rpcErr instanceof Error ? rpcErr.message : 'Database communication failed';
+    console.error('[familyService] create_family exception:', message);
+    return {
+      success: false,
+      error: message,
+    };
   }
-
-  // Seamless fallback for local preview/development/test
-  const localFamilyId = crypto.randomUUID();
-  const newMem: UserFamilyMembership = {
-    id: crypto.randomUUID(),
-    family_id: localFamilyId,
-    family_name: cleanName,
-    description: description?.trim() || '',
-    user_id: userId,
-    role: 'family_head',
-    role_display: getRoleLabel('family_head'),
-    status: 'active',
-    invite_code: familyCode,
-    joined_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
-  };
-  const existing = getLocalUserMemberships(userId);
-  saveLocalUserMemberships(userId, [...existing.filter(m => m.family_id !== localFamilyId), newMem]);
-
-  return {
-    success: true,
-    family_id: localFamilyId,
-    name: cleanName,
-    invite_code: familyCode,
-    role: 'family_head',
-  };
 }
 
 /**
@@ -849,10 +786,11 @@ export async function sendFamilyInvitationToken({
       emailSent: emailRes.success,
       emailNotice: emailRes.success
         ? `Invitation email dispatched to ${cleanEmail}`
-        : emailRes.error || 'Direct email delivery requires VITE_RESEND_API_KEY in .env',
+        : emailRes.error || 'Direct email delivery failed. You can share the invitation link or code directly.',
     };
-  } catch (err: any) {
-    console.error('Error creating invitation:', err);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error creating invitation';
+    console.error('Error creating invitation:', message);
 
     // Save fallback cache even if remote DB network write had issue
     saveLocalCachedInvitation(inviteToken, {
@@ -873,7 +811,7 @@ export async function sendFamilyInvitationToken({
       inviteToken,
       familyCode,
       emailSent: false,
-      emailNotice: 'Invitation link and code generated! Direct email delivery requires VITE_RESEND_API_KEY in .env.',
+      emailNotice: 'Invitation link and code generated! Direct email delivery failed; you can share the link or code manually.',
     };
   }
 }

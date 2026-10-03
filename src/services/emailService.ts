@@ -1,56 +1,18 @@
 /* =========================================================
-   RESEND EMAIL SERVICE HELPER & SUPABASE SMTP CONFIGURATION
-   Provides Resend integration for reliable email delivery
-   (Verification emails, password resets, family invitations).
+   EMAIL SERVICE CLIENT (EmailJS Integration)
+   Dispatches transactional and notification emails through
+   EmailJS service: "service_55smup6".
+   Supports direct browser dispatch via @emailjs/browser,
+   HTTP API fallback, and Supabase Edge Function routing.
    ========================================================= */
 
-export interface EmailPayload {
-  to: string;
-  subject: string;
-  html: string;
-}
+import emailjs from '@emailjs/browser';
+import { supabase } from './supabase';
 
-/**
- * Resend SMTP & Supabase Custom SMTP Configuration Guidelines:
- * 
- * Host: smtp.resend.com
- * Port: 465 or 587
- * Username: resend
- * Password: <YOUR_RESEND_API_KEY> (e.g., re_xxxxxxxxx)
- * Sender Email: onboarding@resend.dev (or your verified domain)
- * Sender Name: FamilyFinanceSync
- */
-export async function sendEmailViaResendApi(payload: EmailPayload, apiKey?: string): Promise<{ success: boolean; id?: string; error?: string }> {
-  const key = apiKey || import.meta.env.VITE_RESEND_API_KEY;
-  if (!key) {
-    return { success: false, error: 'Resend API key is not configured.' };
-  }
-
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        from: 'FamilyFinanceSync <onboarding@resend.dev>',
-        to: [payload.to],
-        subject: payload.subject,
-        html: payload.html,
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to send email via Resend API.');
-    }
-
-    return { success: true, id: data.id };
-  } catch (err: any) {
-    console.error('Resend email error:', err);
-    return { success: false, error: err.message || 'Email delivery failed.' };
-  }
+export interface EmailDeliveryResult {
+  success: boolean;
+  id?: string;
+  error?: string;
 }
 
 export interface FamilyInvitationEmailParams {
@@ -62,69 +24,6 @@ export interface FamilyInvitationEmailParams {
   expiresInDays?: number;
 }
 
-/**
- * Send a structured Family Invitation Email using Resend
- */
-export async function sendInvitationEmail(params: FamilyInvitationEmailParams): Promise<{ success: boolean; id?: string; error?: string }> {
-  const inviteUrl = `${window.location.origin}/family/invite/${params.inviteToken}`;
-  const inviterStr = params.inviterName ? `${params.inviterName} has` : 'You have been';
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; }
-          .card { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-          .header { text-align: center; margin-bottom: 24px; }
-          .logo { font-size: 24px; font-weight: 700; color: #4f46e5; letter-spacing: -0.5px; }
-          .title { font-size: 20px; font-weight: 600; color: #1e293b; margin-top: 12px; }
-          .content { font-size: 15px; line-height: 1.6; color: #475569; margin-bottom: 24px; }
-          .code-box { background: #f1f5f9; border-radius: 8px; padding: 16px; text-align: center; margin: 20px 0; border: 1px dashed #cbd5e1; }
-          .code { font-family: monospace; font-size: 22px; font-weight: 700; letter-spacing: 2px; color: #334155; }
-          .btn-container { text-align: center; margin: 28px 0; }
-          .btn { display: inline-block; background-color: #4f46e5; color: #ffffff !important; font-weight: 600; padding: 12px 28px; border-radius: 8px; text-decoration: none; transition: background-color 0.2s; }
-          .footer { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 32px; line-height: 1.5; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="header">
-            <div class="logo">FamilyFinanceSync</div>
-            <div class="title">Join ${params.familyName} on FamilyFinanceSync</div>
-          </div>
-          <div class="content">
-            <p>Hello,</p>
-            <p>${inviterStr} invited you to join the <strong>${params.familyName}</strong> family workspace on FamilyFinanceSync to manage shared family finances together securely.</p>
-            
-            <div class="btn-container">
-              <a href="${inviteUrl}" class="btn">Accept Family Invitation</a>
-            </div>
-
-            <p>Or join directly using your unique family invitation code:</p>
-            <div class="code-box">
-              <div class="code">${params.familyCode}</div>
-            </div>
-
-            <p style="font-size: 13px; color: #64748b;">This invitation link will expire in ${params.expiresInDays || 7} days.</p>
-          </div>
-          <div class="footer">
-            FamilyFinanceSync — Secure Family Finance Management<br/>
-            If you did not expect this invitation, you can safely ignore this email.
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-
-  return sendEmailViaResendApi({
-    to: params.recipientEmail,
-    subject: `You're invited to join ${params.familyName} on FamilyFinanceSync`,
-    html,
-  });
-}
-
 export interface JoinRequestEmailParams {
   headEmail: string;
   familyName: string;
@@ -133,64 +32,213 @@ export interface JoinRequestEmailParams {
   familyCode: string;
 }
 
-/**
- * Send a Join Request Approval notification email to the Family Head using Resend
- */
-export async function sendJoinRequestEmailToFamilyHead(params: JoinRequestEmailParams): Promise<{ success: boolean; id?: string; error?: string }> {
-  const approvalUrl = `${window.location.origin}/approval-center`;
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; }
-          .card { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
-          .header { text-align: center; margin-bottom: 24px; }
-          .logo { font-size: 24px; font-weight: 700; color: #4f46e5; letter-spacing: -0.5px; }
-          .title { font-size: 20px; font-weight: 600; color: #1e293b; margin-top: 12px; }
-          .content { font-size: 15px; line-height: 1.6; color: #475569; margin-bottom: 24px; }
-          .applicant-box { background: #f1f5f9; border-radius: 8px; padding: 16px; margin: 20px 0; border: 1px solid #cbd5e1; }
-          .btn-container { text-align: center; margin: 28px 0; }
-          .btn { display: inline-block; background-color: #4f46e5; color: #ffffff !important; font-weight: 600; padding: 12px 28px; border-radius: 8px; text-decoration: none; }
-          .footer { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 32px; line-height: 1.5; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="header">
-            <div class="logo">FamilyFinanceSync</div>
-            <div class="title">🔔 New Family Member Join Request</div>
-          </div>
-          <div class="content">
-            <p>Hello Family Head,</p>
-            <p>A new user has requested to join your family workspace <strong>${params.familyName}</strong> using your family code (<code>${params.familyCode}</code>).</p>
-            
-            <div class="applicant-box">
-              <div style="font-weight: 700; font-size: 16px; color: #0f172a;">${params.applicantName}</div>
-              <div style="font-size: 14px; color: #64748b;">${params.applicantEmail}</div>
-            </div>
-
-            <p>Please review and approve or decline this join request in your Executive Approval Center.</p>
-
-            <div class="btn-container">
-              <a href="${approvalUrl}" class="btn">Open Approval Center</a>
-            </div>
-          </div>
-          <div class="footer">
-            FamilyFinanceSync — Secure Family Finance Governance
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-
-  return sendEmailViaResendApi({
-    to: params.headEmail,
-    subject: `[Action Required] New Join Request from ${params.applicantName} for ${params.familyName}`,
-    html,
-  });
+export interface JoinDecisionEmailParams {
+  recipientEmail: string;
+  familyName: string;
+  applicantName?: string;
+  decision: 'approved' | 'rejected';
+  role?: string;
+  reason?: string;
 }
 
+const getEnv = (key: string): string => {
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any)?.env) {
+      return (import.meta as any).env[key] || '';
+    }
+  } catch (e) {}
+  try {
+    if (typeof process !== 'undefined' && process?.env) {
+      return process.env[key] || '';
+    }
+  } catch (e) {}
+  return '';
+};
 
+/**
+ * EmailJS Configuration Settings
+ * Defaults service ID to user's registered ID: service_55smup6
+ */
+export const EMAILJS_CONFIG = {
+  SERVICE_ID: getEnv('VITE_EMAILJS_SERVICE_ID') || 'service_55smup6',
+  TEMPLATE_ID: getEnv('VITE_EMAILJS_TEMPLATE_ID') || '',
+  INVITE_TEMPLATE_ID: getEnv('VITE_EMAILJS_INVITE_TEMPLATE_ID') || getEnv('VITE_EMAILJS_TEMPLATE_ID') || '',
+  REQUEST_TEMPLATE_ID: getEnv('VITE_EMAILJS_REQUEST_TEMPLATE_ID') || getEnv('VITE_EMAILJS_TEMPLATE_ID') || '',
+  PUBLIC_KEY: getEnv('VITE_EMAILJS_PUBLIC_KEY') || 'HEG3QZD4pEenpmuuV',
+  PRIVATE_KEY: getEnv('EMAILJS_PRIVATE_KEY') || 'yjuxNjh82ERnBzobJdI9c',
+};
+
+/**
+ * Dispatch an email via EmailJS API / SDK
+ */
+async function dispatchEmailJS(
+  serviceId: string,
+  templateId: string,
+  templateParams: Record<string, unknown>,
+  publicKey?: string
+): Promise<EmailDeliveryResult> {
+  const resolvedKey = publicKey || EMAILJS_CONFIG.PUBLIC_KEY;
+
+  if (!serviceId) {
+    return {
+      success: false,
+      error: 'EmailJS Service ID is missing.',
+    };
+  }
+
+  // 1. Try SDK dispatch if public key available
+  if (resolvedKey && templateId) {
+    try {
+      const response = await emailjs.send(
+        serviceId,
+        templateId,
+        templateParams,
+        { publicKey: resolvedKey }
+      );
+
+      if (response.status === 200 || response.text === 'OK') {
+        return { success: true, id: `emailjs-${Date.now()}` };
+      }
+    } catch (sdkErr: any) {
+      console.warn('[emailService] EmailJS SDK send error:', sdkErr?.text || sdkErr?.message || sdkErr);
+    }
+  }
+
+  // 2. Direct HTTP REST API fallback
+  if (resolvedKey && templateId) {
+    try {
+      const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          service_id: serviceId,
+          template_id: templateId,
+          user_id: resolvedKey,
+          template_params: templateParams,
+        }),
+      });
+
+      if (res.ok) {
+        return { success: true, id: `emailjs-http-${Date.now()}` };
+      }
+
+      const errText = await res.text();
+      console.warn('[emailService] EmailJS REST API response:', res.status, errText);
+    } catch (httpErr) {
+      console.warn('[emailService] EmailJS REST API network error:', httpErr);
+    }
+  }
+
+  // 3. Fallback: Try Supabase Edge Function if deployed
+  try {
+    const { data, error } = await supabase.functions.invoke('send-email', {
+      body: {
+        serviceId,
+        templateId,
+        templateParams,
+      },
+    });
+
+    if (!error && data?.success) {
+      return { success: true, id: data.id };
+    }
+  } catch (edgeErr) {
+    // Edge function not running or unconfigured
+  }
+
+  // If public key or template ID are not yet configured in .env, inform the user clearly
+  if (!resolvedKey || !templateId) {
+    return {
+      success: false,
+      error: `EmailJS service "${serviceId}" is connected. Please add VITE_EMAILJS_PUBLIC_KEY and VITE_EMAILJS_TEMPLATE_ID to .env to automate inbox delivery.`,
+    };
+  }
+
+  return {
+    success: false,
+    error: 'Failed to deliver email through EmailJS.',
+  };
+}
+
+/**
+ * Send a structured Family Invitation Email via EmailJS.
+ */
+export async function sendInvitationEmail(
+  params: FamilyInvitationEmailParams
+): Promise<EmailDeliveryResult> {
+  const cleanEmail = params.recipientEmail.trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return { success: false, error: 'A valid recipient email address is required.' };
+  }
+
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'http://localhost:5174';
+
+  const inviteLink = `${origin}/family/invite/${params.inviteToken}`;
+  const inviter = params.inviterName?.trim() || 'Family Head';
+
+  const templateParams: Record<string, unknown> = {
+    to_email: cleanEmail,
+    recipient_email: cleanEmail,
+    to_name: params.inviterName ? `Family of ${params.familyName}` : params.familyName,
+    family_name: params.familyName.trim(),
+    inviter_name: inviter,
+    invite_token: params.inviteToken,
+    invite_code: params.familyCode,
+    family_code: params.familyCode,
+    invite_link: inviteLink,
+    expires_in_days: params.expiresInDays || 7,
+    subject: `Invitation to join ${params.familyName} on FamilyFinanceSync`,
+    message: `You have been invited by ${inviter} to join the ${params.familyName} financial workspace on FamilyFinanceSync. Join with invite code "${params.familyCode}" or click: ${inviteLink}`,
+  };
+
+  const templateId = EMAILJS_CONFIG.INVITE_TEMPLATE_ID || EMAILJS_CONFIG.TEMPLATE_ID;
+
+  return await dispatchEmailJS(
+    EMAILJS_CONFIG.SERVICE_ID,
+    templateId,
+    templateParams
+  );
+}
+
+/**
+ * Send a Join Request Approval notification email to the Family Head via EmailJS.
+ */
+export async function sendJoinRequestEmailToFamilyHead(
+  params: JoinRequestEmailParams
+): Promise<EmailDeliveryResult> {
+  const cleanHeadEmail = params.headEmail.trim().toLowerCase();
+  if (!cleanHeadEmail || !cleanHeadEmail.includes('@')) {
+    return { success: false, error: 'A valid family head email address is required.' };
+  }
+
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'http://localhost:5174';
+
+  const approvalUrl = `${origin}/requests`;
+
+  const templateParams: Record<string, unknown> = {
+    to_email: cleanHeadEmail,
+    recipient_email: cleanHeadEmail,
+    head_email: cleanHeadEmail,
+    family_name: params.familyName.trim(),
+    applicant_name: params.applicantName.trim(),
+    applicant_email: params.applicantEmail.trim(),
+    family_code: params.familyCode,
+    approval_link: approvalUrl,
+    subject: `[Action Required] New Join Request for ${params.familyName}`,
+    message: `${params.applicantName} (${params.applicantEmail}) has requested to join your family workspace "${params.familyName}". Click here to review: ${approvalUrl}`,
+  };
+
+  const templateId = EMAILJS_CONFIG.REQUEST_TEMPLATE_ID || EMAILJS_CONFIG.TEMPLATE_ID;
+
+  return await dispatchEmailJS(
+    EMAILJS_CONFIG.SERVICE_ID,
+    templateId,
+    templateParams
+  );
+}

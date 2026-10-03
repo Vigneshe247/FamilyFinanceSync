@@ -84,105 +84,27 @@ export const supabaseAuthService = {
   },
 
   /**
-   * Ensure user has a profile, default family workspace, and is assigned as Family Head
+   * Ensure user has a profile and default family workspace using atomic server-side RPC
    */
-  async ensureUserFamilyWorkspace(user: SupabaseUser, fullName: string, phone?: string) {
+  async ensureUserFamilyWorkspace(_user: SupabaseUser, fullName: string, _mobile?: string) {
     try {
-      // 1. Try upserting profile if table exists
-      try {
-        await supabase.from('profiles').upsert({
-          id: user.id,
-          full_name: fullName || user.email?.split('@')[0] || 'Family Head',
-          email: user.email,
-          phone: phone || '',
-          updated_at: new Date().toISOString(),
-        });
-      } catch (profileErr) {
-        // Ignored if profiles table not present
+      const familyName = fullName ? `${fullName}'s Family` : 'My Family Workspace';
+      const { data, error } = await supabase.rpc('create_family', {
+        p_name: familyName,
+        p_description: null,
+        p_family_code: null,
+      });
+
+      if (error) {
+        console.warn('[supabase] Atomic create_family notice:', error.message);
+        return null;
       }
 
-      // 2. Check if user already belongs to a family
-      const { data: existingMembership } = await supabase
-        .from('family_members')
-        .select('family_id')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      if (!existingMembership || existingMembership.length === 0) {
-        // 3. Create default family
-        const familyName = fullName ? `${fullName}'s Family` : 'My Family Workspace';
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        let codeSuffix = '';
-        for (let i = 0; i < 6; i++) {
-          codeSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        const famCode = `FAM-${codeSuffix}`;
-
-        const { data: newFamily, error: familyErr } = await supabase
-          .from('families')
-          .insert({
-            name: familyName,
-            created_by: user.id,
-            family_code: famCode,
-          })
-          .select('id, name, family_code, created_by, created_at')
-          .single();
-
-        if (familyErr) {
-          console.warn('Could not auto-create family table record:', familyErr.message);
-          return null;
-        }
-
-        if (newFamily) {
-          // 4. Add user as Family Head in family_members
-          await supabase.from('family_members').insert({
-            family_id: newFamily.id,
-            user_id: user.id,
-            role: 'family_head',
-            status: 'active',
-          });
-
-          // 5. Create default starter accounts
-          try {
-            await supabase.from('accounts').insert([
-              {
-                family_id: newFamily.id,
-                name: 'Main Bank Account',
-                type: 'bank',
-                balance: 5000000, // ₹50,000 in paise
-                currency: 'INR',
-                is_shared: true,
-              },
-              {
-                family_id: newFamily.id,
-                name: 'Cash In Hand',
-                type: 'cash',
-                balance: 1000000, // ₹10,000 in paise
-                currency: 'INR',
-                is_shared: true,
-              },
-            ]);
-          } catch (accErr) {}
-
-          // 6. Create default starter categories
-          await supabase.from('categories').insert([
-            { family_id: newFamily.id, name: 'Salary', type: 'income', color: '#16A34A', is_default: true },
-            { family_id: newFamily.id, name: 'Food & Dining', type: 'expense', color: '#E5A11E', is_default: true },
-            { family_id: newFamily.id, name: 'Groceries', type: 'expense', color: '#3E8BF5', is_default: true },
-            { family_id: newFamily.id, name: 'Utilities & Bills', type: 'expense', color: '#9B51E0', is_default: true },
-            { family_id: newFamily.id, name: 'Transportation', type: 'expense', color: '#EC4899', is_default: true },
-            { family_id: newFamily.id, name: 'Education', type: 'expense', color: '#06B6D4', is_default: true },
-          ]);
-
-          return newFamily.id;
-        }
-      } else {
-        return existingMembership[0].family_id;
-      }
-    } catch (err) {
-      console.warn('Workspace provisioning deferred or offline:', err);
+      return data?.family_id || null;
+    } catch (err: unknown) {
+      console.warn('[supabase] Workspace provisioning notice:', err);
+      return null;
     }
-    return null;
   },
 
   async signInWithPassword(email: string, password: string) {

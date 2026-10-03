@@ -183,7 +183,11 @@ const AppInner: React.FC = () => {
 
   // ================= 1. PUBLIC & SETUP ROUTES =================
   if (currentPath === '/login') {
-    if (isAuthenticated && isEmailVerified) {
+    if (isAuthenticated) {
+      if (!isEmailVerified) {
+        navigate('/verify-email');
+        return null;
+      }
       if (familyCount === 0) {
         navigate('/family/setup');
         return null;
@@ -198,7 +202,11 @@ const AppInner: React.FC = () => {
   }
 
   if (currentPath === '/register') {
-    if (isAuthenticated && isEmailVerified) {
+    if (isAuthenticated) {
+      if (!isEmailVerified) {
+        navigate('/verify-email');
+        return null;
+      }
       if (familyCount === 0) {
         navigate('/family/setup');
         return null;
@@ -215,6 +223,18 @@ const AppInner: React.FC = () => {
 
   if (currentPath === '/forgot-password') {
     return <ForgotPasswordPage />;
+  }
+
+  if (
+    currentPath === '/family/setup' ||
+    currentPath === '/family/create' ||
+    currentPath === '/family/join' ||
+    currentPath === '/family/select'
+  ) {
+    if (isAuthenticated && !isEmailVerified) {
+      navigate('/verify-email');
+      return null;
+    }
   }
 
   if (currentPath === '/family/setup') {

@@ -91,8 +91,15 @@ export const VerifyEmailPage: React.FC = () => {
     navigate("/login");
   };
 
-  // Local testing simulation
+  // Local testing simulation (restricted to demo/mock users only)
   const handleSimulateVerify = async () => {
+    if (user && !user.isMock) {
+      setStatusMessage({
+        type: "error",
+        text: "Simulation is only permitted for offline demo users. Live Supabase accounts must be verified through the email link or Supabase Dashboard.",
+      });
+      return;
+    }
     await devSimulateVerify();
     setStatusMessage({
       type: "success",
@@ -220,36 +227,56 @@ export const VerifyEmailPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Developer Testing Mode Helper */}
-        <div
-          style={{
-            marginTop: "2rem",
-            padding: "0.75rem",
-            borderRadius: "12px",
-            background: "var(--bg-canvas-subtle)",
-            border: "1px dashed var(--border-subtle)",
-          }}
-        >
-          <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
-            Testing / Development Environment Simulation:
-          </div>
-          <button
-            type="button"
-            onClick={handleSimulateVerify}
-            className="btn btn-sm"
+        {/* Environment-Aware Verification Notice */}
+        {user?.isMock ? (
+          <div
             style={{
-              background: "rgba(22, 163, 74, 0.1)",
-              color: "#16A34A",
-              border: "1px solid #16A34A",
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              width: "100%",
-              justifyContent: "center",
+              marginTop: "2rem",
+              padding: "0.75rem",
+              borderRadius: "12px",
+              background: "var(--bg-canvas-subtle)",
+              border: "1px dashed var(--border-subtle)",
             }}
           >
-            <ShieldCheck size={14} /> Simulate Email Verified (Testing Mode)
-          </button>
-        </div>
+            <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
+              Offline / Demo Testing Mode:
+            </div>
+            <button
+              type="button"
+              onClick={handleSimulateVerify}
+              className="btn btn-sm"
+              style={{
+                background: "rgba(22, 163, 74, 0.1)",
+                color: "#16A34A",
+                border: "1px solid #16A34A",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                width: "100%",
+                justifyContent: "center",
+              }}
+            >
+              <ShieldCheck size={14} /> Simulate Email Verified (Demo Mode)
+            </button>
+          </div>
+        ) : (
+          <div
+            style={{
+              marginTop: "2rem",
+              padding: "0.85rem",
+              borderRadius: "12px",
+              background: "var(--bg-canvas-subtle)",
+              border: "1px solid var(--border-subtle)",
+              fontSize: "0.78rem",
+              color: "var(--text-muted)",
+              lineHeight: 1.4,
+            }}
+          >
+            <ShieldCheck size={16} color="#059669" style={{ display: "inline", verticalAlign: "middle", marginRight: "4px" }} />
+            <span>
+              Real Supabase Auth in effect. Please click the link received in your inbox to confirm your email, then click <strong>&quot;I&apos;ve Verified My Email&quot;</strong> above.
+            </span>
+          </div>
+        )}
       </div>
     </AuthLayout>
   );

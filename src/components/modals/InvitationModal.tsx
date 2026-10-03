@@ -1,6 +1,6 @@
 /* =========================================================
    FAMILY INVITATION GENERATOR MODAL (Module 5)
-   Generates secure shareable invite links, family codes & sends Resend emails
+   Generates secure shareable invite links, family codes & sends EmailJS emails
    ========================================================= */
 
 import React, { useState } from 'react';
@@ -215,7 +215,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ isOpen, onClos
                   <div>
                     <div style={{ fontWeight: 600 }}>Invitation link & code ready!</div>
                     <div style={{ marginTop: '2px', color: '#78350F', fontSize: '0.76rem', lineHeight: 1.4 }}>
-                      To dispatch automated emails directly to inboxes, add <code>VITE_RESEND_API_KEY</code> in <code>.env</code> or configure Supabase Custom SMTP. You can copy and share the link below directly with your family member.
+                      Connected to EmailJS (<code>service_55smup6</code>). Set <code>VITE_EMAILJS_PUBLIC_KEY</code> and <code>VITE_EMAILJS_TEMPLATE_ID</code> in <code>.env</code> for automated direct inbox dispatch. You can copy and share the link below directly with your family member.
                     </div>
                   </div>
                 </div>

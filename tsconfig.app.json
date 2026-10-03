@@ -13,9 +13,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting & Loose Checks */
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    /* Strict Type-Checking Options */
+    "strict": true,
+    "noImplicitThis": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    "alwaysStrict": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
